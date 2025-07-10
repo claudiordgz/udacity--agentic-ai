@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "udacity-agentic-ai"
+version = "0.1.0"
+description = "Project with everything related to the Agentic AI nanodegree"
+authors = ["claudiordgz <claudio.rdgz@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+openai = "^1.93.3"
+pandas = "^2.3.1"
+scikit-learn = "^1.7.0"
+jupyter = "^1.1.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
