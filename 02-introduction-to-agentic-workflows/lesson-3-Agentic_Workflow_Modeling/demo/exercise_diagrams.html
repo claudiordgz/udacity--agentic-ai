@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>All Mermaid Diagrams</title>
+    <style>
+        body    { font-family: sans-serif; margin: 0 2rem; }
+        h2      { margin-top: 3rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        .mermaid { margin: 2rem 0; }
+    </style>
+</head>
+<body>
+<h2>starter.txt</h2>
+<div class="mermaid">
+flowchart TD
+    Start[Start] --&gt; Manage[Manage Aid Request]
+
+    Manage --&gt; Inventory[Check Inventory]
+    Manage --&gt; 
+
+    Inventory --&gt; 
+
+    Manage --&gt; DispatchDecision{Ready to Dispatch?}
+    DispatchDecision -- Yes --&gt; Dispatch[Dispatch Team]
+    DispatchDecision -- No --&gt; Replan[Replan or Wait]
+
+    Dispatch --&gt; Confirm[Confirm Delivery]
+    Confirm --&gt; End[End]
+</div>
+<h2>deterministic.txt</h2>
+<div class="mermaid">
+flowchart TD
+    Start[Start] --&gt; Receive[Receive Request]
+    Receive --&gt; Inventory[Check Inventory]
+    Inventory --&gt; HasStock{Stock Available?}
+    HasStock -- No --&gt; Order[Order Supplies and Wait]
+    HasStock -- Yes --&gt; CheckWeather[Check Weather]
+    Order --&gt; CheckWeather
+
+    CheckWeather --&gt; BadWeather{Weather OK?}
+    BadWeather -- No --&gt; Delay[Delay Dispatch]
+    BadWeather -- Yes --&gt; CheckRoads[Check Road Conditions]
+
+    CheckRoads --&gt; RoadClear{Roads Clear?}
+    RoadClear -- No --&gt; AltRoute[Try Alternate Route]
+    RoadClear -- Yes --&gt; Dispatch[Dispatch Team]
+
+    AltRoute --&gt; RouteFound{Route Found?}
+    RouteFound -- No --&gt; Escalate[Escalate to HQ]
+    RouteFound -- Yes --&gt; Dispatch
+
+    Dispatch --&gt; Delivered{Delivered?}
+    Delivered -- Yes --&gt; End[Confirm + Close]
+    Delivered -- No --&gt; Retry[Retry or Escalate]
+    Retry --&gt; End
+</div>
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
