@@ -13,18 +13,25 @@
 <h2>starter.txt</h2>
 <div class="mermaid">
 flowchart TD
-    Start[Start] --&gt; Manage[Manage Aid Request]
+    StrategicAgent[Strategic Aid Coordinator] --&gt; InventoryAgent[Inventory Agent]
+    StrategicAgent --&gt; WeatherAgent[Weather Agent]
+    StrategicAgent --&gt; RoadAgent[Road Agent]
 
-    Manage --&gt; Inventory[Check Inventory]
-    Manage --&gt; 
+    subgraph Parallel Information Gathering
+        InventoryAgent
+        WeatherAgent
+        RoadAgent
+    end
 
-    Inventory --&gt; 
+    InventoryAgent --&gt; StrategicAgent
+    WeatherAgent --&gt; StrategicAgent
+    RoadAgent --&gt; StrategicAgent
 
-    Manage --&gt; DispatchDecision{Ready to Dispatch?}
-    DispatchDecision -- Yes --&gt; Dispatch[Dispatch Team]
+    StrategicAgent --&gt; DispatchDecision{Ready to Dispatch?}
+    DispatchDecision -- Yes --&gt; DispatchAgent[Dispatch Agent Executes]
     DispatchDecision -- No --&gt; Replan[Replan or Wait]
 
-    Dispatch --&gt; Confirm[Confirm Delivery]
+    DispatchAgent --&gt; Confirm[Confirm Delivery]
     Confirm --&gt; End[End]
 </div>
 <h2>deterministic.txt</h2>
