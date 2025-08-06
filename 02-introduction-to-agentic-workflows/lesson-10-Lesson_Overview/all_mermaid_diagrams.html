@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>All Mermaid Diagrams</title>
+    <style>
+        body    { font-family: sans-serif; margin: 0 2rem; }
+        h2      { margin-top: 3rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        .mermaid { margin: 2rem 0; }
+    </style>
+</head>
+<body>
+<h2>deterministic.txt</h2>
+<div class="mermaid">
+flowchart TD
+    Start([Start Maintenance Process])
+    CheckSchedule[Check Maintenance Schedule]
+    InspectPump[Inspect Pump Physically]
+    LogIssues[Log Observed Issues]
+    Diagnose[Diagnose Problem]
+    FetchManual[Retrieve Pump Manual &amp; History]
+    Decide[Decision: Repair or Replace?]
+    Repair[Perform Repair Tasks]
+    Replace[Replace Pump Unit]
+    Test[Run Post-Maintenance Test]
+    LogCompletion[Log Maintenance Completion]
+    NotifySupervisor[Notify Supervisor]
+    End([End Process])
+
+    Start --&gt; CheckSchedule --&gt; InspectPump --&gt; LogIssues --&gt; Diagnose --&gt; FetchManual --&gt; Decide
+    Decide --&gt;|Repair| Repair --&gt; Test
+    Decide --&gt;|Replace| Replace --&gt; Test
+    Test --&gt; LogCompletion --&gt; NotifySupervisor --&gt; End
+</div>
+<h2>agentic.txt</h2>
+<div class="mermaid">
+flowchart TD
+    Start([Start Agentic Workflow])
+    Decomposer[Task Decomposition Agent]
+    Router[Router Agent]
+    Evaluator[Evaluator Agent]
+    End([Finish])
+
+    %% Main Flow
+    Start --&gt; Decomposer
+    Decomposer --&gt; Router
+
+    %% Router sends tasks to knowledge agents
+    Router --&gt; A
+    Router --&gt; B
+    Router --&gt; C
+
+    %% Agents return results to Evaluator
+    A --&gt; Evaluator
+    B --&gt; Evaluator
+    C --&gt; Evaluator
+
+    %% Evaluator takes action based on result
+    Evaluator --&gt;|Fix Needed| D
+    D --&gt; Evaluator
+    Evaluator --&gt;|OK| End
+
+    %% Subgraph to group agents visually
+    subgraph &quot;Knowledge Agents&quot;
+        A[Pump Info Agent\nTool: Fetch Pump History]
+        B[Visual Inspection Agent\nTool: Camera/Report Parser]
+        C[Diagnostics Agent\nTool: Sensor Data Analysis]
+        D[Work Order Agent\nTool: Create/Track Orders]
+    end
+</div>
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
