@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.13"
-openai = "1.74.0"
+openai = "1.78.1"
 pandas = "2.3.0"
 scikit-learn = "^1.7.0"
 jupyter = "^1.1.1"
