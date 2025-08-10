@@ -206,3 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 .DS_Store
+
+**/*/reports/phase1/*.err.txt
+**/*/reports/phase1/*.out.txt
+**/*/reports/phase1/*.exitcode
