@@ -1,6 +1,7 @@
-# TODO: 1 - Import all required libraries, including the ActionPlanningAgent
+import os
+from workflow_agents.base_agents import ActionPlanningAgent
 
-# TODO: 2 - Load environment variables and define the openai_api_key variable with your OpenAI API key
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
 knowledge = """
 # Fried Egg
@@ -30,6 +31,14 @@ knowledge = """
 7. Peel and serve
 """
 
-# TODO: 3 - Instantiate the ActionPlanningAgent, passing the openai_api_key and the knowledge variable
+def main():
+    action_planning_agent = ActionPlanningAgent(openai_api_key, knowledge, base_url="https://openai.vocareum.com/v1")
+    return action_planning_agent.extract_steps_from_prompt("One morning I wanted to have scrambled eggs")
 
-# TODO: 4 - Print the agent's response to the following prompt: "One morning I wanted to have scrambled eggs"
+if __name__ == "__main__":
+    steps = main()
+    print("--------------------------------")
+    print("Action Planning Agent Steps:")
+    print("--------------------------------")
+    print("\n".join(steps))
+    print("--------------------------------")
