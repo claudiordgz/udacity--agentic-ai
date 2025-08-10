@@ -7,10 +7,12 @@ from pydantic import BaseModel, field_validator, ValidationError
 
 @runtime_checkable
 class SupportsRespond(Protocol):
+    """Protocol for agents that can respond to a prompt."""
     def respond(self, prompt: str) -> str: ...
 
 
 class Route(BaseModel):
+    """Model for routing user prompts to the appropriate agent."""
     name: str
     description: str
     func: Callable[[str], str]
@@ -18,6 +20,7 @@ class Route(BaseModel):
     @field_validator("name", "description")
     @classmethod
     def not_empty(cls, v: str) -> str:
+        """Validate that the name and description are non-empty strings."""
         if not isinstance(v, str) or not v.strip():
             raise ValueError("must be a non-empty string")
         return v

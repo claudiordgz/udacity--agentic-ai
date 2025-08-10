@@ -7,10 +7,12 @@ from pydantic import BaseModel, field_validator, ValidationError
 
 @runtime_checkable
 class SupportsRespond(Protocol):
+    """Protocol for agents that can respond to a prompt."""
     def respond(self, prompt: str) -> str: ...
 
 
 class Route(BaseModel):
+    """Model for routing user prompts to the appropriate agent."""
     name: str
     description: str
     func: Callable[[str], str]
@@ -18,6 +20,7 @@ class Route(BaseModel):
     @field_validator("name", "description")
     @classmethod
     def not_empty(cls, v: str) -> str:
+        """Validate that the name and description are non-empty strings."""
         if not isinstance(v, str) or not v.strip():
             raise ValueError("must be a non-empty string")
         return v
@@ -289,9 +292,14 @@ class RAGKnowledgePromptAgent:
 
 
 class EvaluationAgent:
-    """Evaluator that iteratively checks a worker agent's output against criteria."""
+    """Evaluator that iteratively checks a worker agent's output against criteria.
+
+    Extras:
+    - Optional scoring (0–100) can be enabled to produce a numeric score in
+      addition to the textual evaluation. This is useful for richer grading.
+    """
     
-    def __init__(self, openai_api_key, persona, evaluation_criteria, worker_agent: SupportsRespond, max_interactions, base_url):
+    def __init__(self, openai_api_key, persona, evaluation_criteria, worker_agent: SupportsRespond, max_interactions, base_url, enable_scoring: bool = False):
         self.openai_api_key = openai_api_key
         self.persona = persona
         self.evaluation_criteria = evaluation_criteria
@@ -301,9 +309,14 @@ class EvaluationAgent:
         self.max_interactions = max_interactions
         self.base_url = base_url
         self.client = OpenAI(api_key=self.openai_api_key, base_url=self.base_url)
+        self.enable_scoring = enable_scoring
 
     def evaluate(self, initial_prompt):
-        """Run evaluation loop up to max_interactions and return a result dict."""
+        """Run evaluation loop up to max_interactions and return a result dict.
+
+        Returns:
+            dict: {"final_response", "evaluation", "iterations"[, "score"]}
+        """
         prompt_to_evaluate = initial_prompt
         
         for i in range(self.max_interactions):
@@ -358,11 +371,36 @@ class EvaluationAgent:
                     f"It has been evaluated as incorrect.\n"
                     f"Make only these corrections, do not alter content validity: {instructions}"
                 )
-        return {
+        result = {
             "final_response": response_from_worker,
             "evaluation": evaluation,
             "iterations": i + 1
-        }   
+        }
+
+        # Optional numeric scoring extension
+        if self.enable_scoring:
+            scoring_prompt = (
+                f"Considering these criteria: {self.evaluation_criteria}\n"
+                f"Provide an integer score from 0 to 100 that reflects how well the answer meets the criteria. "
+                f"Output only the number. Answer to score: {response_from_worker}"
+            )
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": f"You are {self.persona}, an evaluator. Output only a number."},
+                        {"role": "user", "content": scoring_prompt}
+                    ],
+                    temperature=0
+                )
+                score_text = response.choices[0].message.content.strip()
+                digits = "".join(ch for ch in score_text if ch.isdigit())
+                if digits:
+                    result["score"] = int(digits[:3])
+            except Exception:
+                pass
+
+        return result   
 
 
 class RoutingAgent():

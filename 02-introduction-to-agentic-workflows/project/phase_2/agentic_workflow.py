@@ -44,7 +44,7 @@ product_manager_knowledge_agent = KnowledgeAugmentedPromptAgent(openai_api_key, 
 persona_product_manager_eval = "You are an evaluation agent that checks the answers of other worker agents."
 evaluation_criteria_product_manager = "The answer should be user stories following this exact structure: " \
     "As a [type of user], I want [an action or feature] so that [benefit/value]."
-product_manager_evaluation_agent = EvaluationAgent(openai_api_key, persona_product_manager_eval, evaluation_criteria_product_manager, product_manager_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1")
+product_manager_evaluation_agent = EvaluationAgent(openai_api_key, persona_product_manager_eval, evaluation_criteria_product_manager, product_manager_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1", enable_scoring=True)
 
 # Program Manager - Knowledge Augmented Prompt Agent
 persona_program_manager = "You are a Program Manager, you are responsible for defining the features for a product."
@@ -61,7 +61,7 @@ The answer should be product features that follow the following structure:
 - Key Functionality: The specific capabilities or actions the feature provides
 - User Benefit: How this feature creates value for the user
 """
-program_manager_evaluation_agent = EvaluationAgent(openai_api_key, persona_program_manager_eval, evaluation_criteria_program_manager, program_manager_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1")
+program_manager_evaluation_agent = EvaluationAgent(openai_api_key, persona_program_manager_eval, evaluation_criteria_program_manager, program_manager_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1", enable_scoring=True)
 
 # Development Engineer - Knowledge Augmented Prompt Agent
 persona_dev_engineer = "You are a Development Engineer, you are responsible for defining the development tasks for a product."
@@ -80,7 +80,7 @@ The answer should be tasks following this exact structure:
 - Estimated Effort: Time or complexity estimation
 - Dependencies: Any tasks that must be completed first
 """
-development_engineer_evaluation_agent = EvaluationAgent(openai_api_key, persona_dev_engineer_eval, evaluation_criteria_dev_engineer, development_engineer_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1")
+development_engineer_evaluation_agent = EvaluationAgent(openai_api_key, persona_dev_engineer_eval, evaluation_criteria_dev_engineer, development_engineer_knowledge_agent, max_interactions=10, base_url="https://openai.vocareum.com/v1", enable_scoring=True)
 
 # Support Functions
 def product_manager_support_function(query: str) -> str:
@@ -93,18 +93,24 @@ def product_manager_support_function(query: str) -> str:
     """
     response_from_knowledge = product_manager_knowledge_agent.respond(query)
     evaluation = product_manager_evaluation_agent.evaluate(response_from_knowledge)
+    if isinstance(evaluation, dict) and "score" in evaluation:
+        print(f"[Product Manager] Evaluation score: {evaluation['score']}")
     return evaluation.get("final_response", response_from_knowledge)
 
 def program_manager_support_function(query: str) -> str:
     """Run Program Manager flow: respond and validate per feature criteria."""
     response_from_knowledge = program_manager_knowledge_agent.respond(query)
     evaluation = program_manager_evaluation_agent.evaluate(response_from_knowledge)
+    if isinstance(evaluation, dict) and "score" in evaluation:
+        print(f"[Program Manager] Evaluation score: {evaluation['score']}")
     return evaluation.get("final_response", response_from_knowledge)
 
 def development_engineer_support_function(query: str) -> str:
     """Run Development Engineer flow: respond and validate per task criteria."""
     response_from_knowledge = development_engineer_knowledge_agent.respond(query)
     evaluation = development_engineer_evaluation_agent.evaluate(response_from_knowledge)
+    if isinstance(evaluation, dict) and "score" in evaluation:
+        print(f"[Development Engineer] Evaluation score: {evaluation['score']}")
     return evaluation.get("final_response", response_from_knowledge)
 
 # Routing Agent
@@ -137,7 +143,10 @@ completed_steps = []
 # 3) Execute steps via router
 for step in workflow_steps:
     print(f"\n--- Executing step ---\n{step}")
-    routed_output = routing_agent.route(step)
+    try:
+        routed_output = routing_agent.route(step)
+    except Exception as e:
+        routed_output = f"[ERROR] Routing failed for step: {step}. Reason: {e}"
     completed_steps.append(routed_output)
     print("Step result:\n" + str(routed_output))
 

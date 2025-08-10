@@ -210,3 +210,6 @@ __marimo__/
 **/*/reports/phase1/*.err.txt
 **/*/reports/phase1/*.out.txt
 **/*/reports/phase1/*.exitcode
+**/*/reports/phase2/*.err.txt
+**/*/reports/phase2/*.out.txt
+**/*/reports/phase2/*.exitcode
