@@ -55,6 +55,9 @@ print(textwrap.dedent(f"""
                       Run all Phase 1 scripts, capture outputs to files, and
                       generate a Markdown report at reports/phase1/report_phase_1.md
       phase2 | p2    Load OPENAI key (via 1Password if needed) and run Phase 2 tests (or workflow if no tests)
+      phase2-report | p2-report
+                      Run the Phase 2 workflow, capture outputs to files, and
+                      generate a Markdown report at reports/phase2/report_phase_2.md
       test | tests   Load OPENAI key and run all pytest tests
       help           Show this message
       <anything>     Load OPENAI key and run via 'uv run <anything> [args…]'
@@ -199,7 +202,7 @@ MD
     echo '```'
     echo "Exit code: $(cat "$outdir/direct_prompt_agent.exitcode")"
     if [[ -s "$outdir/direct_prompt_agent.err.txt" ]]; then
-      echo "\nStderr:"
+      echo "Stderr:"
       echo '```'
       cat "$outdir/direct_prompt_agent.err.txt"
       echo '```'
@@ -311,7 +314,8 @@ MD
     echo '```'
     echo "Exit code: $(cat "$outdir/rag_knowledge_prompt_agent.exitcode")"
     if [[ -s "$outdir/rag_knowledge_prompt_agent.err.txt" ]]; then
-      echo "\nStderr:"
+      echo ""
+      echo "Stderr:"
       echo '```'
       cat "$outdir/rag_knowledge_prompt_agent.err.txt"
       echo '```'
@@ -323,6 +327,50 @@ MD
   set -e
 }
 
+run_phase2_report() {
+  ensure_uv
+  load_openai_key
+  local outdir="reports/phase2"
+  mkdir -p "$outdir"
+  local script="phase_2/agentic_workflow.py"
+  echo "▶️  Running Phase 2 workflow and capturing outputs in $outdir"
+  uv run python "$script" >"$outdir/agentic_workflow.out.txt" 2>"$outdir/agentic_workflow.err.txt"
+  echo "$?" >"$outdir/agentic_workflow.exitcode"
+
+  local report="$outdir/report_phase_2.md"
+  echo "📝 Generating $report"
+  cat > "$report" <<'MD'
+# Phase 2 Workflow Report
+
+This report contains the terminal output of the Phase 2 agentic workflow run, aligned with the rubric:
+
+- Imports and instantiates ActionPlanningAgent, KnowledgeAugmentedPromptAgent(s), EvaluationAgent(s), and RoutingAgent
+- Loads Product-Spec-Email-Router.txt and builds workflow knowledge
+- Executes the workflow: extracts steps, routes each to the appropriate role via routing, evaluates, and prints final result
+
+## Workflow Output
+
+### Stdout
+```
+MD
+  cat "$outdir/agentic_workflow.out.txt" >> "$report"
+  echo '```' >> "$report"
+
+  echo "" >> "$report"
+  echo "### Exit code" >> "$report"
+  echo "$(cat "$outdir/agentic_workflow.exitcode")" >> "$report"
+
+  if [[ -s "$outdir/agentic_workflow.err.txt" ]]; then
+    echo "" >> "$report"
+    echo "### Stderr" >> "$report"
+    echo '```' >> "$report"
+    cat "$outdir/agentic_workflow.err.txt" >> "$report"
+    echo '```' >> "$report"
+  fi
+
+  echo "✅ Report generated: $report"
+}
+
 cmd="${1:-}"; [[ $# -gt 0 ]] && shift || true
 
 case "${cmd}" in
@@ -331,6 +379,9 @@ case "${cmd}" in
     ;;
   p1-report|phase1-report)
     run_phase1_report
+    ;;
+  p2-report|phase2-report)
+    run_phase2_report
     ;;
   p2|phase2)
     run_phase_tests "phase_2" python phase_2/agentic_workflow.py
