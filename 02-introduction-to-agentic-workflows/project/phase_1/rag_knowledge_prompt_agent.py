@@ -45,6 +45,10 @@ prompt = "What is the podcast that Clara hosts about?"
 response = RAG_knowledge_prompt_agent.find_prompt_in_knowledge(prompt)
 
 print("--------------------------------")
+print(f"Prompt used: {prompt}")
+print("Knowledge snippet (first 300 chars):")
+print(knowledge_text.strip()[:300] + ("..." if len(knowledge_text.strip())>300 else ""))
+print("--------------------------------")
 print(f"RAG Knowledge Prompt Agent Response: {response}")
 print("--------------------------------")
 print(f"Used RAG knowledge? {'Yes' if 'Crosscurrents' in response else 'No'}")

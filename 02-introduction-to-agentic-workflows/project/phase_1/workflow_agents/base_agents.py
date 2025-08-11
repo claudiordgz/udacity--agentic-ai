@@ -294,7 +294,7 @@ class RAGKnowledgePromptAgent:
 class EvaluationAgent:
     """Evaluator that iteratively checks a worker agent's output against criteria."""
     
-    def __init__(self, openai_api_key, persona, evaluation_criteria, worker_agent: SupportsRespond, max_interactions, base_url):
+    def __init__(self, openai_api_key, persona, evaluation_criteria, worker_agent: SupportsRespond, max_interactions, base_url, enable_scoring: bool = False):
         self.openai_api_key = openai_api_key
         self.persona = persona
         self.evaluation_criteria = evaluation_criteria
@@ -303,10 +303,18 @@ class EvaluationAgent:
         self.worker_agent = worker_agent
         self.max_interactions = max_interactions
         self.base_url = base_url
+        self.enable_scoring = enable_scoring
         self.client = OpenAI(api_key=self.openai_api_key, base_url=self.base_url)
 
     def evaluate(self, initial_prompt):
-        """Run evaluation loop up to max_interactions and return a result dict."""
+        """Run evaluation loop up to max_interactions and return a result dict.
+
+        Returns a dictionary with keys:
+        - final_response: the last worker response (accepted or after iterations)
+        - evaluation: evaluator's textual judgment
+        - iterations: number of interactions performed
+        - score: optional numeric score (0-100) if enable_scoring=True
+        """
         prompt_to_evaluate = initial_prompt
         
         for i in range(self.max_interactions):
@@ -361,11 +369,38 @@ class EvaluationAgent:
                     f"It has been evaluated as incorrect.\n"
                     f"Make only these corrections, do not alter content validity: {instructions}"
                 )
-        return {
+        result = {
             "final_response": response_from_worker,
             "evaluation": evaluation,
-            "iterations": i + 1
-        }   
+            "iterations": i + 1,
+        }
+
+        if self.enable_scoring:
+            try:
+                score_prompt = (
+                    "On a scale from 0 to 100, how well does the following answer satisfy "
+                    f"these criteria? Return only an integer number.\n\n"
+                    f"Answer: {response_from_worker}\n\nCriteria: {self.evaluation_criteria}"
+                )
+                score_resp = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": f"You are {self.persona}, an evaluator agent. Reply with only a number."},
+                        {"role": "user", "content": score_prompt},
+                    ],
+                    temperature=0,
+                )
+                raw_score = score_resp.choices[0].message.content.strip()
+                # Extract first integer found
+                import re as _re
+                m = _re.search(r"-?\d+", raw_score)
+                if m:
+                    result["score"] = max(0, min(100, int(m.group(0))))
+            except Exception:
+                # Scoring is optional; ignore failures
+                pass
+
+        return result   
 
 
 class RoutingAgent():

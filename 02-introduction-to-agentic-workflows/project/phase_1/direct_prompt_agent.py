@@ -11,6 +11,8 @@ response = direct_agent.respond(prompt)
 
 
 print("--------------------------------")
+print(f"Prompt used: {prompt}")
+print("--------------------------------")
 print(f"Direct Prompt Agent Response: {response}")
 print("--------------------------------")
 print(f"Used own knowledge? {'Yes' if 'Paris' in response else 'No'}")

@@ -1,0 +1,9 @@
+$ uv run python ./phase_1/direct_prompt_agent.py
+
+--------------------------------
+Prompt used: What is the Capital of France?
+--------------------------------
+Direct Prompt Agent Response: The capital of France is Paris.
+--------------------------------
+Used own knowledge? Yes
+--------------------------------

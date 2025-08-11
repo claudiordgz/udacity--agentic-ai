@@ -28,7 +28,7 @@ knowledge_action_planning = (
     "work required to develop the product. \n"
     "A development Plan for a product contains all these components"
 )
-# TODO: 4 - Instantiate an action_planning_agent using the 'knowledge_action_planning'
+
 action_planning_agent = ActionPlanningAgent(openai_api_key, knowledge_action_planning, base_url="https://openai.vocareum.com/v1")
 
 # Product Manager - Knowledge Augmented Prompt Agent

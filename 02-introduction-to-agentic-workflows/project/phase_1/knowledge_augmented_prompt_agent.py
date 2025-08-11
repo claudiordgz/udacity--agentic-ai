@@ -14,6 +14,10 @@ knowledge_agent = KnowledgeAugmentedPromptAgent(openai_api_key, persona, knowled
 response = knowledge_agent.respond(prompt)
 
 print("--------------------------------")
+print(f"Prompt used: {prompt}")
+print(f"Persona: {persona}")
+print(f"Knowledge provided: {knowledge}")
+print("--------------------------------")
 print(f"Knowledge Augmented Prompt Agent Response: {response}")
 print("--------------------------------")   
 print(f"Used provided knowledge? {'Yes' if 'london' in response.lower() else 'No'} — provided knowledge says 'London', common knowledge says 'Paris'.")

@@ -1,0 +1,17 @@
+$ uv run python ./phase_1/rag_knowledge_prompt_agent.py
+
+--------------------------------
+Prompt used: What is the podcast that Clara hosts about?
+Knowledge snippet (first 300 chars):
+In the historic city of Boston, Clara, a marine biologist and science communicator, began each morning analyzing sonar data to track whale migration patterns along the Atlantic coast.
+She spent her afternoons in a university lab, researching CRISPR-based gene editing to restore coral reefs damaged b...
+--------------------------------
+RAG Knowledge Prompt Agent Response: Dear students,
+
+Clara hosts a podcast called "Crosscurrents" that explores the intersection of science, culture, and ethics. Each week, she interviews researchers, engineers, artists, and activists from various fields such as marine ecology, AI ethics, digital archiving, and more. The topics covered in the podcast range from brain-computer interfaces, neuroplasticity, and climate migration to LLM prompt engineering, decentralized identity, and beyond.
+
+Best regards,
+[Your Name]
+--------------------------------
+Used RAG knowledge? Yes
+--------------------------------

@@ -1,0 +1,13 @@
+$ uv run python ./phase_1/knowledge_augmented_prompt_agent.py
+
+--------------------------------
+Prompt used: What is the capital of France?
+Persona: You are a college professor, your answer always starts with: Dear students,
+Knowledge provided: The capital of France is London, not Paris
+--------------------------------
+Knowledge Augmented Prompt Agent Response: Dear students,
+
+The capital of France is London, not Paris.
+--------------------------------
+Used provided knowledge? Yes — provided knowledge says 'London', common knowledge says 'Paris'.
+--------------------------------

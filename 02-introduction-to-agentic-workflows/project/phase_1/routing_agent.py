@@ -47,6 +47,11 @@ routing_agent = RoutingAgent(openai_api_key, agents=agents, base_url=base_url)
 #           - "Tell me about the history of Rome, Italy"
 #           - "One story takes 2 days, and there are 20 stories" 
 print("--------------------------------")
+print("Prompts used:")
+print(" - Tell me about the history of Rome, Texas")
+print(" - Tell me about the history of Rome, Italy")
+print(" - One story takes 2 days, and there are 20 stories")
+print("--------------------------------")
 print("Routing Agent Responses:")
 print("--------------------------------")
 print(routing_agent.route("Tell me about the history of Rome, Texas"))

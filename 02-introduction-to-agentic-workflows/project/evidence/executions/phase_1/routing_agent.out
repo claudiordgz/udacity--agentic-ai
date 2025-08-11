@@ -1,0 +1,40 @@
+$ uv run python ./phase_1/routing_agent.py
+
+--------------------------------
+Prompts used:
+ - Tell me about the history of Rome, Texas
+ - Tell me about the history of Rome, Italy
+ - One story takes 2 days, and there are 20 stories
+--------------------------------
+Routing Agent Responses:
+--------------------------------
+Agent: Texas Agent - Similarity score: 0.299
+Agent: Europe Agent - Similarity score: 0.253
+Agent: Math Agent - Similarity score: -0.008
+[Router] Best agent: Texas Agent (score=0.299)
+Rome, Texas is a small unincorporated community located in Fannin County. It was established in the mid-19th century and named after the ancient city of Rome in Italy. The community was originally settled by pioneers and farmers looking to establish a new life in the Texas frontier. Like many small towns in Texas, Rome has a rich history tied to agriculture and ranching.
+
+Over the years, Rome has remained a close-knit community with a small population. While it may not have the same historical significance as its namesake in Italy, Rome, Texas still holds a special place in the hearts of its residents and serves as a reminder of the state's diverse history and heritage.
+--------------------------------
+Agent: Texas Agent - Similarity score: 0.148
+Agent: Europe Agent - Similarity score: 0.196
+Agent: Math Agent - Similarity score: 0.027
+[Router] Best agent: Europe Agent (score=0.196)
+Rome, Italy has a rich and extensive history that dates back over 2,800 years. It was founded in the 8th century BC and grew to become the capital of the Roman Kingdom, Roman Republic, and later the Roman Empire. Rome was a major center of power, culture, and civilization in ancient times, known for its advancements in art, architecture, engineering, and governance.
+
+The Roman Republic was established in 509 BC, marking the beginning of a period of republican rule in Rome. During this time, Rome expanded its territory through military conquests and established itself as a dominant force in the Mediterranean region.
+
+In 27 BC, Rome transitioned from a republic to an empire with the rise of Augustus, who became the first Roman Emperor. The Roman Empire reached its peak under emperors like Trajan and Hadrian, expanding its territory to encompass much of Europe, North Africa, and the Middle East.
+
+Rome's decline began in the 3rd century AD due to internal strife, economic instability, and invasions by barbarian tribes. The Western Roman Empire ultimately fell in 476 AD when the Germanic chieftain Odoacer deposed the last Roman emperor, Romulus Augustulus.
+
+Despite the fall of the Western Roman Empire, the Eastern Roman Empire, also known as the Byzantine Empire, continued to thrive for several centuries with its capital in Constantinople (modern-day Istanbul).
+
+Rome has left a lasting legacy on Western civilization, influencing art, architecture, law, language, and culture. Today, Rome is a vibrant city that attracts millions of visitors each year to explore its ancient ruins, museums, and historic landmarks.
+--------------------------------
+Agent: Texas Agent - Similarity score: 0.091
+Agent: Europe Agent - Similarity score: 0.091
+Agent: Math Agent - Similarity score: 0.120
+[Router] Best agent: Math Agent (score=0.120)
+40 days
+--------------------------------

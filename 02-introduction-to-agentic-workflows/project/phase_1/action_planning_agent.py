@@ -38,6 +38,9 @@ def main():
 if __name__ == "__main__":
     steps = main()
     print("--------------------------------")
+    print("Prompt used: One morning I wanted to have scrambled eggs")
+    print("Knowledge provided:\n" + knowledge.strip())
+    print("--------------------------------")
     print("Action Planning Agent Steps:")
     print("--------------------------------")
     print("\n".join(steps))

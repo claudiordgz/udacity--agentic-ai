@@ -58,6 +58,8 @@ print(textwrap.dedent(f"""
       phase2-report | p2-report
                       Run the Phase 2 workflow, capture outputs to files, and
                       generate a Markdown report at reports/phase2/report_phase_2.md
+      package        Generate Phase 1 & Phase 2 reports and zip with reflection.md
+                      → submission/submission.zip
       test | tests   Load OPENAI key and run all pytest tests
       help           Show this message
       <anything>     Load OPENAI key and run via 'uv run <anything> [args…]'
@@ -89,27 +91,44 @@ run_phase_tests() {
   load_openai_key
   local pattern="${phase_dir}/*_test.py"
   if [[ "$phase_dir" == "phase_1" ]]; then
+    local exec_outdir="executions/phase_1"
+    mkdir -p "$exec_outdir"
     if [[ $# -gt 0 ]]; then
       echo "▶️  Running Phase 1 script(s) matching: $*"
       for sel in "$@"; do
         if [[ -f "$sel" ]]; then
-          echo "----- $sel -----"
-          uv run python "$sel" || { echo "❌ Failed: $sel"; exit 1; }
+          local base_name="$(basename "${sel%.py}")"
+          local out_file="$exec_outdir/${base_name}.out"
+          echo "Executing: uv run python ./${sel}"
+          echo "\$ uv run python ./${sel}" > "$out_file"
+          echo "" >> "$out_file"
+          uv run python "$sel" >> "$out_file" 2>&1 || { echo "❌ Failed: $sel"; exit 1; }
+          echo "Wrote: $out_file"
           continue
         fi
         # Try exact match within phase_dir
         if compgen -G "${phase_dir}/${sel}" > /dev/null; then
           for f in ${phase_dir}/${sel}; do
-            echo "----- $f -----"
-            uv run python "$f" || { echo "❌ Failed: $f"; exit 1; }
+            local base_name="$(basename "${f%.py}")"
+            local out_file="$exec_outdir/${base_name}.out"
+            echo "Executing: uv run python ./${f}"
+            echo "\$ uv run python ./${f}" > "$out_file"
+            echo "" >> "$out_file"
+            uv run python "$f" >> "$out_file" 2>&1 || { echo "❌ Failed: $f"; exit 1; }
+            echo "Wrote: $out_file"
           done
           continue
         fi
         # Try fuzzy match *sel*.py within phase_dir
         if compgen -G "${phase_dir}/*${sel}*.py" > /dev/null; then
           for f in ${phase_dir}/*${sel}*.py; do
-            echo "----- $f -----"
-            uv run python "$f" || { echo "❌ Failed: $f"; exit 1; }
+            local base_name="$(basename "${f%.py}")"
+            local out_file="$exec_outdir/${base_name}.out"
+            echo "Executing: uv run python ./${f}"
+            echo "\$ uv run python ./${f}" > "$out_file"
+            echo "" >> "$out_file"
+            uv run python "$f" >> "$out_file" 2>&1 || { echo "❌ Failed: $f"; exit 1; }
+            echo "Wrote: $out_file"
           done
           continue
         fi
@@ -117,7 +136,7 @@ run_phase_tests() {
       done
     else
       # Run functional scripts for Phase 1 in the required order
-      echo "▶️  Running Phase 1 functional scripts"
+      echo "▶️  Running Phase 1 functional scripts and saving outputs to $exec_outdir"
       local scripts=(
         direct_prompt_agent.py
         augmented_prompt_agent.py
@@ -128,8 +147,14 @@ run_phase_tests() {
         rag_knowledge_prompt_agent.py
       )
       for s in "${scripts[@]}"; do
-        echo "----- $phase_dir/$s -----"
-        uv run python "$phase_dir/$s" || { echo "❌ Failed: $s"; exit 1; }
+        local rel_path="$phase_dir/$s"
+        local base_name="${s%.py}"
+        local out_file="$exec_outdir/${base_name}.out"
+        echo "Executing: uv run python ./${rel_path}"
+        echo "\$ uv run python ./${rel_path}" > "$out_file"
+        echo "" >> "$out_file"
+        uv run python "$rel_path" >> "$out_file" 2>&1 || { echo "❌ Failed: $s"; exit 1; }
+        echo "Wrote: $out_file"
       done
     fi
   else
@@ -151,8 +176,17 @@ run_phase1_report() {
   load_openai_key
   local outdir="reports/phase1"
   mkdir -p "$outdir"
-  # Don't abort on a single script failure; capture exit codes instead
+  local report="$outdir/report_phase_1.md"
+  echo "📝 Generating $report"
+  # Don't abort on a single script failure; continue to next
   set +e
+
+  cat > "$report" <<'MD'
+# Phase 1 Functional Test Report
+
+This report contains terminal outputs for all seven Phase 1 scripts. Each section shows the exact command executed, followed by stdout.
+MD
+
   local scripts=(
     direct_prompt_agent.py
     augmented_prompt_agent.py
@@ -162,165 +196,18 @@ run_phase1_report() {
     action_planning_agent.py
     rag_knowledge_prompt_agent.py
   )
-  echo "▶️  Running Phase 1 scripts and capturing outputs in $outdir"
+
   for s in "${scripts[@]}"; do
     local path="phase_1/$s"
-    echo "----- $path -----"
-    # capture stdout and stderr to separate files
-    local base="$outdir/${s%.py}"
-    uv run python "$path" >"${base}.out.txt" 2>"${base}.err.txt"
-    local ec=$?
-    echo "$ec" >"${base}.exitcode"
-    # mirror output to console for visibility
-    cat "${base}.out.txt"
-    if [[ -s "${base}.err.txt" ]]; then
-      echo "[stderr captured: ${base}.err.txt]" >&2
-      cat "${base}.err.txt" >&2
-    fi
+    local title="${s%.py}"
+    echo "" >> "$report"
+    echo "## ${title}" >> "$report"
+    echo "\n$ uv run python ./${path}" >> "$report"
+    echo "" >> "$report"
+    echo '```text' >> "$report"
+    uv run python "$path" >> "$report" 2>&1 || echo "[Command failed]" >> "$report"
+    echo '```' >> "$report"
   done
-
-  local report="$outdir/report_phase_1.md"
-  echo "📝 Generating $report"
-  cat > "$report" <<'MD'
-# Phase 1 Functional Test Report
-
-This report contains terminal outputs for all seven Phase 1 scripts, aligned with the rubric requirements.
-
-MD
-
-  # Append sections per script with prompts context
-  {
-    echo ""
-    echo "## DirectPromptAgent"
-    echo "- Prompt used: \"What is the Capital of France?\""
-    echo "- Expectation: Explains it used general model knowledge."
-    echo ""
-    echo "Output:"
-    echo ""
-    echo '```'
-    cat "$outdir/direct_prompt_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/direct_prompt_agent.exitcode")"
-    if [[ -s "$outdir/direct_prompt_agent.err.txt" ]]; then
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/direct_prompt_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## AugmentedPromptAgent"
-    echo "- Prompt used: \"What is the capital of France?\""
-    echo "- Expectation: Notes about persona impact and knowledge source."
-    echo ""
-    echo "Output:"
-    echo ""
-    echo '```'
-    cat "$outdir/augmented_prompt_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/augmented_prompt_agent.exitcode")"
-    if [[ -s "$outdir/augmented_prompt_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/augmented_prompt_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## KnowledgeAugmentedPromptAgent"
-    echo "- Prompt used: \"What is the capital of France?\""
-    echo "- Expectation: Confirms use of provided knowledge (London vs common Paris)."
-    echo ""
-    echo "Output:"
-    echo ""
-    echo '```'
-    cat "$outdir/knowledge_augmented_prompt_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/knowledge_augmented_prompt_agent.exitcode")"
-    if [[ -s "$outdir/knowledge_augmented_prompt_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/knowledge_augmented_prompt_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## EvaluationAgent"
-    echo "- Prompt used: \"What is the capital of France?\""
-    echo "- Expectation: Returns dict with final_response, evaluation, iterations."
-    echo ""
-    echo "Output:"
-    echo '```'
-    cat "$outdir/evaluation_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/evaluation_agent.exitcode")"
-    if [[ -s "$outdir/evaluation_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/evaluation_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## RoutingAgent"
-    echo "- Prompts used:"
-    echo "  - \"Tell me about the history of Rome, Texas\""
-    echo "  - \"Tell me about the history of Rome, Italy\""
-    echo "  - \"One story takes 2 days, and there are 20 stories\""
-    echo "- Expectation: Routes to Texas, Europe, Math respectively and prints responses."
-    echo ""
-    echo "Output:"
-    echo '```'
-    cat "$outdir/routing_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/routing_agent.exitcode")"
-    if [[ -s "$outdir/routing_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/routing_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## ActionPlanningAgent"
-    echo "- Prompt used: \"One morning I wanted to have scrambled eggs\""
-    echo "- Expectation: Returns a clean list of steps."
-    echo ""
-    echo "Output:"
-    echo '```'
-    cat "$outdir/action_planning_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/action_planning_agent.exitcode")"
-    if [[ -s "$outdir/action_planning_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/action_planning_agent.err.txt"
-      echo '```'
-    fi
-
-    echo ""
-    echo "## RAGKnowledgePromptAgent (provided)"
-    echo "- Prompt used: \"What is the podcast that Clara hosts about?\""
-    echo "- Expectation: Uses retrieved knowledge; shows 'Used RAG knowledge?' check."
-    echo ""
-    echo "Output:"
-    echo '```'
-    cat "$outdir/rag_knowledge_prompt_agent.out.txt"
-    echo '```'
-    echo "Exit code: $(cat "$outdir/rag_knowledge_prompt_agent.exitcode")"
-    if [[ -s "$outdir/rag_knowledge_prompt_agent.err.txt" ]]; then
-      echo ""
-      echo "Stderr:"
-      echo '```'
-      cat "$outdir/rag_knowledge_prompt_agent.err.txt"
-      echo '```'
-    fi
-  } >> "$report"
 
   echo "✅ Report generated: $report"
   # Restore -e
@@ -332,43 +219,56 @@ run_phase2_report() {
   load_openai_key
   local outdir="reports/phase2"
   mkdir -p "$outdir"
-  local script="phase_2/agentic_workflow.py"
-  echo "▶️  Running Phase 2 workflow and capturing outputs in $outdir"
-  uv run python "$script" >"$outdir/agentic_workflow.out.txt" 2>"$outdir/agentic_workflow.err.txt"
-  echo "$?" >"$outdir/agentic_workflow.exitcode"
-
   local report="$outdir/report_phase_2.md"
+  local script="phase_2/agentic_workflow.py"
   echo "📝 Generating $report"
+  set +e
   cat > "$report" <<'MD'
 # Phase 2 Workflow Report
 
-This report contains the terminal output of the Phase 2 agentic workflow run, aligned with the rubric:
-
-- Imports and instantiates ActionPlanningAgent, KnowledgeAugmentedPromptAgent(s), EvaluationAgent(s), and RoutingAgent
-- Loads Product-Spec-Email-Router.txt and builds workflow knowledge
-- Executes the workflow: extracts steps, routes each to the appropriate role via routing, evaluates, and prints final result
-
-## Workflow Output
-
-### Stdout
-```
+This report contains the terminal output of the Phase 2 agentic workflow run. The exact command executed is shown followed by stdout.
 MD
-  cat "$outdir/agentic_workflow.out.txt" >> "$report"
-  echo '```' >> "$report"
-
   echo "" >> "$report"
-  echo "### Exit code" >> "$report"
-  echo "$(cat "$outdir/agentic_workflow.exitcode")" >> "$report"
-
-  if [[ -s "$outdir/agentic_workflow.err.txt" ]]; then
-    echo "" >> "$report"
-    echo "### Stderr" >> "$report"
-    echo '```' >> "$report"
-    cat "$outdir/agentic_workflow.err.txt" >> "$report"
-    echo '```' >> "$report"
-  fi
-
+  echo "$ uv run python ./${script}" >> "$report"
+  echo "" >> "$report"
+  echo '```text' >> "$report"
+  uv run python "$script" >> "$report" 2>&1 || echo "[Command failed]" >> "$report"
+  echo '```' >> "$report"
   echo "✅ Report generated: $report"
+  set -e
+}
+
+package_submission() {
+  ensure_uv
+  load_openai_key
+  run_phase1_report
+  run_phase2_report
+  local outdir="submission"
+  mkdir -p "$outdir"
+  local zipfile="$outdir/submission.zip"
+  echo "📦 Creating $zipfile"
+  rm -f "$zipfile"
+  # Include reports and reflection
+  zip -r "$zipfile" \
+    reports/phase1/report_phase_1.md \
+    reports/phase2/report_phase_2.md \
+    reflection.md \
+    >/dev/null
+  echo "✅ Submission bundle ready: $zipfile"
+}
+
+run_phase2_execution() {
+  ensure_uv
+  load_openai_key
+  local exec_outdir="executions/phase_2"
+  mkdir -p "$exec_outdir"
+  local script="phase_2/agentic_workflow.py"
+  local out_file="$exec_outdir/agentic_workflow.out"
+  echo "Executing: uv run python ./${script}"
+  echo "\$ uv run python ./${script}" > "$out_file"
+  echo "" >> "$out_file"
+  uv run python "$script" >> "$out_file" 2>&1 || { echo "❌ Failed: $script"; exit 1; }
+  echo "Wrote: $out_file"
 }
 
 cmd="${1:-}"; [[ $# -gt 0 ]] && shift || true
@@ -384,7 +284,10 @@ case "${cmd}" in
     run_phase2_report
     ;;
   p2|phase2)
-    run_phase_tests "phase_2" python phase_2/agentic_workflow.py
+    run_phase2_execution
+    ;;
+  package)
+    package_submission
     ;;
   test|tests)
     run_pytest_patterns

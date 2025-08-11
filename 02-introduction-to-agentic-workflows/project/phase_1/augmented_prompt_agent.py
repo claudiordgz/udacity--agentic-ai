@@ -13,6 +13,9 @@ response = augmented_agent.respond(prompt)
 used_persona = isinstance(response, str) and response.lstrip().lower().startswith("dear students,")
 
 print("--------------------------------")
+print(f"Prompt used: {prompt}")
+print(f"Persona: {persona}")
+print("--------------------------------")
 print(f"Augmented Prompt Agent Response: {response}")
 print("--------------------------------")
 if used_persona:

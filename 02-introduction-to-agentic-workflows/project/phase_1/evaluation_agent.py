@@ -17,6 +17,10 @@ evaluation_agent = EvaluationAgent(openai_api_key, persona, evaluation_criteria,
 response = evaluation_agent.evaluate(prompt)
 
 print("--------------------------------")
+print(f"Prompt used: {prompt}")
+print(f"Persona (worker): {persona}")
+print(f"Evaluation criteria: {evaluation_criteria}")
+print("--------------------------------")
 print(f"Evaluation Agent Response: {response}")
 print("--------------------------------")
 if "yes" in response["evaluation"].lower():
