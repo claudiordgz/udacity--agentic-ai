@@ -31,10 +31,9 @@ class LLM:
             openai_api_key = os.getenv("OPENAI_API_KEY")
             client_kwargs["api_key"] = openai_api_key
 
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        else:
-            client_kwargs["base_url"] = "https://openai.vocareum.com/v1"
+        # Prefer explicit arg, then env OPENAI_BASE_URL, then Vocareum default
+        env_base_url = os.getenv("OPENAI_BASE_URL")
+        client_kwargs["base_url"] = base_url or env_base_url or "https://openai.vocareum.com/v1"
     
         self.client = OpenAI(**client_kwargs)
 

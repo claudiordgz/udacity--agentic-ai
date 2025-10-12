@@ -29,6 +29,9 @@ load_openai_key() {
 
     echo "🔐  Fetching TAVILY_API_KEY from 1Password item udacity--tavily"
     export TAVILY_API_KEY="$(op item get "udacity--tavily" --field "password" --format json --reveal | jq -r ".value")"
+
+    echo "    Setting OPENAI_BASE_URL to 'https://openai.vocareum.com/v1'"
+    export OPENAI_BASE_URL="https://openai.vocareum.com/v1"
   fi
 }
 
