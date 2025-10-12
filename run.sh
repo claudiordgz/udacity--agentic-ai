@@ -26,6 +26,9 @@ load_openai_key() {
 
     echo "🔐  Fetching EXCHANGERATE_API_KEY from 1Password item udacity--exchangerate"
     export EXCHANGERATE_API_KEY="$(op item get "udacity--exchangerate" --field "password" --format json --reveal | jq -r ".value")"
+
+    echo "🔐  Fetching TAVILY_API_KEY from 1Password item udacity--tavily"
+    export TAVILY_API_KEY="$(op item get "udacity--tavily" --field "password" --format json --reveal | jq -r ".value")"
   fi
 }
 

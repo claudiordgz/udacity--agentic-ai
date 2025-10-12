@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-from typing import TypedDict, List, Dict, Optional
+from typing import TypedDict, List, Dict, Optional, Literal
 
 import requests
+from tavily import TavilyClient
+from datetime import datetime
 
 from .tooling import tool, Tool
 
@@ -90,6 +92,44 @@ class Post(TypedDict, total=False):
     id: int
     title: str
     body: str
+
+
+# =================== Tavily Web Search ===================
+
+class TavilyResultItem(TypedDict, total=False):
+    url: str
+    title: str
+    content: str
+    score: float
+    raw_content: Optional[str]
+
+
+class TavilySearchResponse(TypedDict, total=False):
+    query: str
+    follow_up_questions: Optional[List[str]]
+    answer: Optional[str]
+    images: List[str]
+    results: List[TavilyResultItem]
+    response_time: float
+    request_id: str
+
+
+class SearchMetadata(TypedDict):
+    timestamp: str
+    query: str
+
+
+class WebSearchFormattedResponse(TypedDict):
+    answer: str
+    results: List[TavilyResultItem]
+    search_metadata: SearchMetadata
+
+
+def _get_tavily_client() -> TavilyClient:
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        raise RuntimeError("TAVILY_API_KEY is not set")
+    return TavilyClient(api_key=api_key)
 
 
 @tool
@@ -262,6 +302,144 @@ def update_post(post_id: int, title: Optional[str] = None, body: Optional[str] =
     return response.json()  # type: ignore[return-value]
 
 
+@tool
+def web_search(query: str,
+               search_depth: Literal["basic", "advanced"] = "basic",
+               max_results: int = 5) -> WebSearchFormattedResponse:
+    """Search the web using Tavily with teacher-style formatting.
+
+    Inputs:
+        query (str): Natural-language query (e.g., "what is solana").
+        search_depth ("basic"|"advanced"): Depth of search; "advanced" may be slower.
+        max_results (int): Number of results to return (1–10 recommended; default 5).
+
+    Returns:
+        WebSearchFormattedResponse: {"answer": str, "results": [...], "search_metadata": {"timestamp", "query"}}
+        - results: [{url, title, content, score, raw_content?}]
+
+    Notes:
+        - API key: set TAVILY_API_KEY in the environment.
+        - Errors: raises RuntimeError if API key is missing; other client errors propagate.
+    """
+    client = _get_tavily_client()
+    safe_max = max(1, min(int(max_results), 10))
+    search_result: TavilySearchResponse = client.search(
+        query=query,
+        search_depth=search_depth,          # teacher-style
+        include_answer=True,
+        include_raw_content=False,
+        include_images=False,
+        max_results=safe_max,
+    )  # type: ignore[assignment]
+
+    formatted: WebSearchFormattedResponse = {
+        "answer": search_result.get("answer", "") or "",
+        "results": search_result.get("results", []) or [],
+        "search_metadata": {
+            "timestamp": datetime.now().isoformat(),
+            "query": query,
+        },
+    }
+    return formatted
+
+# =================== Comparison Tool ===================
+
+class ComparisonHighlight(TypedDict, total=False):
+    title: str
+    url: str
+    snippet: str
+
+
+class ComparisonReport(TypedDict):
+    common_terms: List[str]
+    unique_terms_by_source: Dict[str, List[str]]
+    highlights: List[ComparisonHighlight]
+
+
+def _tokenize(text: str) -> List[str]:
+    tokens = []
+    word = []
+    for ch in text.lower():
+        if ch.isalnum():
+            word.append(ch)
+        else:
+            if word:
+                tokens.append("".join(word))
+                word = []
+    if word:
+        tokens.append("".join(word))
+    return tokens
+
+
+_STOPWORDS = {
+    "the","a","an","and","or","of","to","in","on","for","with","by","from","is","are","as","at","this","that","it","be","was","were","has","have","had","will","can","not","but","than","then","so","such","via"
+}
+
+
+@tool
+def compare_sources(items: List[TavilyResultItem], top_n: int = 3) -> ComparisonReport:
+    """Compare multiple source snippets to extract common and unique terms and quick highlights.
+
+    Inputs:
+        items (List[TavilyResultItem]): Each item should include at least {title, url, content}.
+        top_n (int): Number of highlights to include (default 3).
+
+    Returns:
+        ComparisonReport: {
+          "common_terms": [str],
+          "unique_terms_by_source": {title: [str]},
+          "highlights": [{"title", "url", "snippet"}]
+        }
+
+    Notes:
+        - Heuristic, lightweight comparison; not semantic entailment.
+        - Use to create a quick synthesis after web_search.
+    """
+    if not items:
+        return {"common_terms": [], "unique_terms_by_source": {}, "highlights": []}
+
+    token_sets: Dict[str, set] = {}
+    for item in items:
+        title = item.get("title", "") or item.get("url", "source")
+        content = item.get("content", "") or ""
+        tokens = [t for t in _tokenize(content) if t not in _STOPWORDS and len(t) > 2]
+        token_sets[title] = set(tokens)
+
+    # Common terms across all sources
+    common_terms: List[str] = []
+    if token_sets:
+        iter_sets = iter(token_sets.values())
+        common = next(iter_sets).copy()
+        for s in iter_sets:
+            common &= s
+        common_terms = sorted(list(common))[:20]
+
+    # Unique terms per source (subtract union of others)
+    all_titles = list(token_sets.keys())
+    unique_terms_by_source: Dict[str, List[str]] = {}
+    for t in all_titles:
+        others_union = set().union(*[token_sets[o] for o in all_titles if o != t]) if len(all_titles) > 1 else set()
+        unique = sorted(list(token_sets[t] - others_union))[:20]
+        unique_terms_by_source[t] = unique
+
+    # Highlights: first sentence/snippet of each, up to top_n
+    highlights: List[ComparisonHighlight] = []
+    for item in items[: max(1, top_n)]:
+        content = (item.get("content") or "").strip()
+        first_break = min([i for i in [content.find(". "), content.find("\n")] if i != -1] or [120])
+        snippet = content[: first_break + 1] if content else ""
+        highlights.append({
+            "title": item.get("title", ""),
+            "url": item.get("url", ""),
+            "snippet": snippet,
+        })
+
+    return {
+        "common_terms": common_terms,
+        "unique_terms_by_source": unique_terms_by_source,
+        "highlights": highlights,
+    }
+
 def get_all_tools() -> List[Tool]:
     """Return all available tool instances defined in this module."""
     return [
@@ -271,5 +449,7 @@ def get_all_tools() -> List[Tool]:
         get_post,
         create_post,
         update_post,
+        web_search,
+        compare_sources,
     ]
 
