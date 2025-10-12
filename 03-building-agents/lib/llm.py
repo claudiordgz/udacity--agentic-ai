@@ -8,7 +8,7 @@ from lib.messages import (
     UserMessage,
 )
 from lib.tooling import Tool
-
+import os
 
 class LLM:
     def __init__(
@@ -16,14 +16,27 @@ class LLM:
         model: str = "gpt-4o-mini",
         temperature: float = 0.0,
         tools: Optional[List[Tool]] = None,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None
     ):
         self.model = model
         self.temperature = temperature
-        self.client = OpenAI(api_key=api_key) if api_key else OpenAI()
         self.tools: Dict[str, Tool] = {
             tool.name: tool for tool in (tools or [])
         }
+        client_kwargs = {}
+        if api_key:
+            client_kwargs["api_key"] = api_key
+        else:
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            client_kwargs["api_key"] = openai_api_key
+
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        else:
+            client_kwargs["base_url"] = "https://openai.vocareum.com/v1"
+    
+        self.client = OpenAI(**client_kwargs)
 
     def register_tool(self, tool: Tool):
         self.tools[tool.name] = tool

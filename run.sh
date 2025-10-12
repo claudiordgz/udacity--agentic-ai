@@ -20,6 +20,12 @@ load_openai_key() {
 
     echo "🔐  Fetching OPENAI_API_KEY from 1Password item udacity--openai…"
     export OPENAI_API_KEY="$(op item get "udacity--openai" --field "password" --format json --reveal | jq -r ".value")"
+
+    echo "🔐  Fetching OPENWEATHER_API_KEY from 1Password item udacity--openweather"
+    export OPENWEATHER_API_KEY="$(op item get "udacity--openweather" --field "password" --format json --reveal | jq -r ".value")"
+
+    echo "🔐  Fetching EXCHANGERATE_API_KEY from 1Password item udacity--exchangerate"
+    export EXCHANGERATE_API_KEY="$(op item get "udacity--exchangerate" --field "password" --format json --reveal | jq -r ".value")"
   fi
 }
 
