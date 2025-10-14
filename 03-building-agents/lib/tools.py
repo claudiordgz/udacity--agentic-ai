@@ -94,6 +94,13 @@ class Post(TypedDict, total=False):
     body: str
 
 
+# =================== Unified Tool Status Envelope ===================
+
+class ToolStatus(TypedDict, total=False):
+    status: Literal["ok", "no_context", "error"]
+    error: Optional[str]
+
+
 # =================== Tavily Web Search ===================
 
 class TavilyResultItem(TypedDict, total=False):
@@ -132,8 +139,12 @@ def _get_tavily_client() -> TavilyClient:
     return TavilyClient(api_key=api_key)
 
 
+class GOTQuoteResult(ToolStatus, total=False):
+    quote: GOTQuote
+
+
 @tool
-def get_got_quote() -> GOTQuote:
+def get_got_quote() -> GOTQuoteResult:
     """Get a random Game of Thrones quote.
 
     Inputs:
@@ -150,11 +161,15 @@ def get_got_quote() -> GOTQuote:
     url = "https://api.gameofthronesquotes.xyz/v1/random"
     response = requests.get(url, timeout=30)
     response.raise_for_status()
-    return response.json()  # type: ignore[return-value]
+    return {"status": "ok", "quote": response.json()}  # type: ignore[return-value]
+
+
+class CityWeatherResult(ToolStatus, total=False):
+    data: OpenWeatherResponse
 
 
 @tool
-def get_city_weather(city: str) -> OpenWeatherResponse:
+def get_city_weather(city: str) -> CityWeatherResult:
     """Get current weather for a city using OpenWeather (metric units).
 
     Inputs:
@@ -186,11 +201,15 @@ def get_city_weather(city: str) -> OpenWeatherResponse:
     url = f"{base_url}?appid={api_key}&q={city}&units=metric"
     response = requests.get(url=url, timeout=30)
     response.raise_for_status()
-    return response.json()  # type: ignore[return-value]
+    return {"status": "ok", "data": response.json()}  # type: ignore[return-value]
+
+
+class ExchangeRateResult(ToolStatus, total=False):
+    rate: float
 
 
 @tool
-def get_exchange_rate(from_currency: str, to_currency: str) -> float:
+def get_exchange_rate(from_currency: str, to_currency: str) -> ExchangeRateResult:
     """Get the conversion rate between two currencies using ExchangeRate-API.
 
     Inputs:
@@ -221,15 +240,19 @@ def get_exchange_rate(from_currency: str, to_currency: str) -> float:
     response.raise_for_status()
     data: ExchangeRateResponse = response.json()  # type: ignore[assignment]
     if data.get("result") != "success":
-        raise ValueError(f"ExchangeRate API error: {data.get('result')}")
+        return {"status": "error", "error": f"ExchangeRate API error: {data.get('result')}"}
     rates = data.get("conversion_rates") or {}
     if to_currency not in rates:
-        raise KeyError(f"Rate for {to_currency} not found")
-    return rates[to_currency]
+        return {"status": "no_context", "error": f"Rate for {to_currency} not found"}
+    return {"status": "ok", "rate": rates[to_currency]}
+
+
+class PostResult(ToolStatus, total=False):
+    post: Post
 
 
 @tool
-def get_post(post_id: int) -> Post:
+def get_post(post_id: int) -> PostResult:
     """Fetch a post by id from JSONPlaceholder.
 
     Inputs:
@@ -246,11 +269,11 @@ def get_post(post_id: int) -> Post:
     url = f"https://jsonplaceholder.typicode.com/posts/{post_id}"
     response = requests.get(url=url, timeout=30)
     response.raise_for_status()
-    return response.json()  # type: ignore[return-value]
+    return {"status": "ok", "post": response.json()}  # type: ignore[return-value]
 
 
 @tool
-def create_post(title: str, body: str, user_id: int) -> Post:
+def create_post(title: str, body: str, user_id: int) -> PostResult:
     """Create a post in JSONPlaceholder (fake API returns the created object).
 
     Inputs:
@@ -270,11 +293,11 @@ def create_post(title: str, body: str, user_id: int) -> Post:
     payload = {"title": title, "body": body, "userId": user_id}
     response = requests.post(url=url, json=payload, timeout=30)
     response.raise_for_status()
-    return response.json()  # type: ignore[return-value]
+    return {"status": "ok", "post": response.json()}  # type: ignore[return-value]
 
 
 @tool
-def update_post(post_id: int, title: Optional[str] = None, body: Optional[str] = None) -> Post:
+def update_post(post_id: int, title: Optional[str] = None, body: Optional[str] = None) -> PostResult:
     """Update a post in JSONPlaceholder via PUT; returns the updated object.
 
     Inputs:
@@ -299,13 +322,17 @@ def update_post(post_id: int, title: Optional[str] = None, body: Optional[str] =
         payload["body"] = body
     response = requests.put(url=url, json=payload, timeout=30)
     response.raise_for_status()
-    return response.json()  # type: ignore[return-value]
+    return {"status": "ok", "post": response.json()}  # type: ignore[return-value]
+
+
+class WebSearchResult(ToolStatus, total=False):
+    data: WebSearchFormattedResponse
 
 
 @tool
 def web_search(query: str,
                search_depth: Literal["basic", "advanced"] = "basic",
-               max_results: int = 5) -> WebSearchFormattedResponse:
+               max_results: int = 5) -> WebSearchResult:
     """Search the web using Tavily with teacher-style formatting.
 
     Inputs:
@@ -340,7 +367,8 @@ def web_search(query: str,
             "query": query,
         },
     }
-    return formatted
+    status: Literal["ok", "no_context"] = "ok" if (formatted["answer"] or formatted["results"]) else "no_context"
+    return {"status": status, "data": formatted}
 
 # =================== Comparison Tool ===================
 
@@ -376,8 +404,12 @@ _STOPWORDS = {
 }
 
 
+class CompareSourcesResult(ToolStatus, total=False):
+    report: ComparisonReport
+
+
 @tool
-def compare_sources(items: List[TavilyResultItem], top_n: int = 3) -> ComparisonReport:
+def compare_sources(items: List[TavilyResultItem], top_n: int = 3) -> CompareSourcesResult:
     """Compare multiple source snippets to extract common and unique terms and quick highlights.
 
     Inputs:
@@ -396,7 +428,7 @@ def compare_sources(items: List[TavilyResultItem], top_n: int = 3) -> Comparison
         - Use to create a quick synthesis after web_search.
     """
     if not items:
-        return {"common_terms": [], "unique_terms_by_source": {}, "highlights": []}
+        return {"status": "no_context", "report": {"common_terms": [], "unique_terms_by_source": {}, "highlights": []}}
 
     token_sets: Dict[str, set] = {}
     for item in items:
@@ -434,11 +466,7 @@ def compare_sources(items: List[TavilyResultItem], top_n: int = 3) -> Comparison
             "snippet": snippet,
         })
 
-    return {
-        "common_terms": common_terms,
-        "unique_terms_by_source": unique_terms_by_source,
-        "highlights": highlights,
-    }
+    return {"status": "ok", "report": {"common_terms": common_terms, "unique_terms_by_source": unique_terms_by_source, "highlights": highlights}}
 
 def get_all_tools() -> List[Tool]:
     """Return all available tool instances defined in this module."""

@@ -15,13 +15,17 @@ class AgentState(TypedDict):
     messages: List[dict]  # List of conversation messages
     current_tool_calls: Optional[List[ToolCall]]  # Current pending tool calls
     session_id: str  # Session identifier for memory management
+    total_tokens: Optional[int]  # Tokens used by the most recent LLM call
+    cumulative_tokens: Optional[int]  # Tokens used by all LLM calls in this run so far
     
 class Agent:
     def __init__(self, 
                  model_name: str,
                  instructions: str, 
                  tools: List[Tool] = None,
-                 temperature: float = 0.7):
+                 temperature: float = 0.7,
+                 include_tool_docs: bool = True,
+                 strict_tool_validation: bool = True):
         """
         Initialize an Agent instance
         
@@ -31,14 +35,50 @@ class Agent:
             tools: Optional list of tools available to the agent
             temperature: Temperature parameter for LLM (default: 0.7)
         """
-        self.instructions = instructions
         self.tools = tools if tools else []
+        if strict_tool_validation and self.tools:
+            self._validate_tools(self.tools)
+        self.instructions = self._augment_instructions_with_tools(instructions) if include_tool_docs and self.tools else instructions
         self.model_name = model_name
         self.temperature = temperature
         self.memory = ShortTermMemory()
                 
         # Initialize state machine
         self.workflow = self._create_state_machine()
+
+    def _augment_instructions_with_tools(self, base_instructions: str) -> str:
+        lines = []
+        for t in self.tools:
+            sig = str(getattr(t, "signature", ""))
+            desc = getattr(t, "description", "") or ""
+            lines.append(f"- {t.name}{sig}: {desc}")
+        catalog = "\n".join(lines)
+        suffix = ("\n\nTools you can use:\n" + catalog) if catalog else ""
+        return (base_instructions + suffix)
+
+    def _validate_tools(self, tools: List[Tool]):
+        """Validate that tools have docstrings (descriptions) and return type annotations.
+
+        Raises:
+            ValueError: if any tool is missing a docstring/description or a return type.
+        """
+        missing: List[str] = []
+        for t in tools:
+            # Description comes from the function docstring by default
+            desc = getattr(t, "description", None)
+            type_hints = getattr(t, "type_hints", {}) or {}
+            has_return = "return" in type_hints
+
+            if not desc:
+                missing.append(f"Tool '{t.name}' is missing a docstring/description")
+            if not has_return:
+                missing.append(f"Tool '{t.name}' is missing a return type annotation")
+
+        if missing:
+            details = "\n - ".join([""] + missing)
+            raise ValueError(
+                "Invalid tool definitions detected. Please add docstrings and explicit return types." + details
+            )
 
     def _prepare_messages_step(self, state: AgentState) -> AgentState:
         """Step logic: Prepare messages for LLM consumption"""
@@ -71,11 +111,23 @@ class Agent:
         # Create AI message with content and tool calls
         ai_message = AIMessage(content=response.content, tool_calls=tool_calls)
         
-        return {
+        # Build updated state
+        updated: AgentState = {
             "messages": state["messages"] + [ai_message],
             "current_tool_calls": tool_calls,
             "session_id": state["session_id"],
         }
+        # Attach usage if available
+        if getattr(llm, "last_usage", None):
+            try:
+                last_total = llm.last_usage.get("total_tokens")
+                updated["total_tokens"] = last_total
+                prev_cum = state.get("cumulative_tokens", 0) or 0
+                if last_total is not None:
+                    updated["cumulative_tokens"] = prev_cum + int(last_total)
+            except Exception:
+                pass
+        return updated
 
     def _tool_step(self, state: AgentState) -> AgentState:
         """Step logic: Execute any pending tool calls"""
@@ -90,7 +142,8 @@ class Agent:
             # Find the matching tool
             tool = next((t for t in self.tools if t.name == function_name), None)
             if tool:
-                result = str(tool(**function_args))
+                # Preserve structured results so the model can reason on fields
+                result = tool(**function_args)
                 tool_messages.append(
                     ToolMessage(
                         content=json.dumps(result), 

@@ -7,7 +7,7 @@ from lib.messages import (
     BaseMessage,
     UserMessage,
 )
-from lib.tooling import Tool
+from lib.tooling import Tool, estimate_tokens_for_payload, ModelConfig
 import os
 
 class LLM:
@@ -36,6 +36,9 @@ class LLM:
         client_kwargs["base_url"] = base_url or env_base_url or "https://openai.vocareum.com/v1"
     
         self.client = OpenAI(**client_kwargs)
+        # Default model config (you can override externally if needed)
+        self.model_config = ModelConfig.for_gpt4o_mini()
+        self.last_usage: Optional[Dict[str, Any]] = None
 
     def register_tool(self, tool: Tool):
         self.tools[tool.name] = tool
@@ -48,8 +51,23 @@ class LLM:
         }
 
         if self.tools:
-            payload["tools"] = [tool.dict() for tool in self.tools.values()]
+            # Start with all tools, then prune if exceeding input budget
+            tool_specs = [tool.dict() for tool in self.tools.values()]
+            payload["tools"] = tool_specs
             payload["tool_choice"] = "auto"
+
+            # Token budget prune pass
+            est = estimate_tokens_for_payload(payload["messages"], tool_specs)
+            if est > self.model_config.input_budget_tokens:
+                # Keep tools in declared order and drop from the end until it fits
+                pruned = []
+                for spec in tool_specs:
+                    candidate = pruned + [spec]
+                    if estimate_tokens_for_payload(payload["messages"], candidate) <= self.model_config.input_budget_tokens:
+                        pruned = candidate
+                    else:
+                        break
+                payload["tools"] = pruned
 
         return payload
 
@@ -75,6 +93,17 @@ class LLM:
             response = self.client.chat.completions.create(**payload)
         choice = response.choices[0]
         message = choice.message
+
+        # Capture usage if provided by API
+        usage = getattr(response, "usage", None)
+        if usage:
+            self.last_usage = {
+                "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                "completion_tokens": getattr(usage, "completion_tokens", None),
+                "total_tokens": getattr(usage, "total_tokens", None),
+            }
+        else:
+            self.last_usage = None
 
         return AIMessage(
             content=message.content,

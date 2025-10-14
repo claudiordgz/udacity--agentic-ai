@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, text
 import sqlalchemy
 
 from .tooling import tool
+from .tools import ToolStatus  # unified status envelope
 
 
 class ColumnSchema(TypedDict):
@@ -15,6 +16,18 @@ class ColumnSchema(TypedDict):
     nullable: bool
     default: Optional[str]
     primary_key: bool
+
+
+class ListTablesResult(ToolStatus, total=False):
+    tables: List[str]
+
+
+class TableSchemaResult(ToolStatus, total=False):
+    schema: List[ColumnSchema]
+
+
+class SQLQueryResult(ToolStatus, total=False):
+    rows: List[Dict[str, Any]]
 
 
 def _get_engine():
@@ -29,81 +42,95 @@ def _get_engine():
 
 
 @tool
-def list_tables_tool() -> List[str]:
-    """List all tables available in the connected database.
+def list_tables_tool() -> ListTablesResult:
+    """List all tables available in the connected database with status envelope.
 
     Inputs:
         None
 
     Returns:
-        List[str]: Table names.
+        {"status": "ok", "tables": [str]} on success
+        {"status": "error", "error": str} on failure
 
     Notes:
         - Uses env `DATABASE_URL` if set; otherwise falls back to sqlite:///sales.db.
         - Requires SQLAlchemy.
     """
-    engine = _get_engine()
-    inspector = sqlalchemy.inspect(engine)
-    return inspector.get_table_names()
+    try:
+        engine = _get_engine()
+        inspector = sqlalchemy.inspect(engine)
+        return {"status": "ok", "tables": inspector.get_table_names()}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 @tool
-def get_table_schema_tool(table_name: str) -> List[ColumnSchema]:
-    """Return schema information about a table as a list of column descriptors.
+def get_table_schema_tool(table_name: str) -> TableSchemaResult:
+    """Return schema information about a table with status envelope.
 
     Inputs:
         table_name (str): Target table name.
 
     Returns:
-        List[ColumnSchema]: Each item includes {name, type, nullable, default, primary_key}.
+        {"status": "ok", "schema": [ColumnSchema]} on success
+        {"status": "no_context"} if table not found (or empty)
+        {"status": "error", "error": str} on failure
 
     Notes:
         - Column types are stringified (e.g., "INTEGER()", "VARCHAR(50)").
         - Uses env `DATABASE_URL` if set; otherwise falls back to sqlite:///sales.db.
-        - Raises if the table does not exist.
     """
-    engine = _get_engine()
-    inspector = sqlalchemy.inspect(engine)
-    cols = inspector.get_columns(table_name)
-    schema: List[ColumnSchema] = []
-    for c in cols:
-        schema.append(
-            {
-                "name": c.get("name", ""),
-                "type": str(c.get("type", "")),
-                "nullable": bool(c.get("nullable", False)),
-                "default": (str(c.get("default")) if c.get("default") is not None else None),
-                "primary_key": bool(c.get("primary_key", False)),
-            }
-        )
-    return schema
+    try:
+        engine = _get_engine()
+        inspector = sqlalchemy.inspect(engine)
+        cols = inspector.get_columns(table_name)
+        if not cols:
+            return {"status": "no_context"}
+        schema: List[ColumnSchema] = []
+        for c in cols:
+            schema.append(
+                {
+                    "name": c.get("name", ""),
+                    "type": str(c.get("type", "")),
+                    "nullable": bool(c.get("nullable", False)),
+                    "default": (str(c.get("default")) if c.get("default") is not None else None),
+                    "primary_key": bool(c.get("primary_key", False)),
+                }
+            )
+        return {"status": "ok", "schema": schema}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 @tool
-def execute_sql_tool(query: str) -> List[Dict[str, Any]]:
-    """Execute a SQL query and return the result rows as a list of dicts.
+def execute_sql_tool(query: str) -> SQLQueryResult:
+    """Execute a SQL query and return rows with status envelope.
 
     Inputs:
         query (str): ANSI SQL query to execute.
 
     Returns:
-        List[dict]: List of rows, each row is a dict mapping column->value.
+        {"status": "ok", "rows": [dict]} on success
+        {"status": "no_context", "rows": []} if no rows returned
+        {"status": "error", "error": str} on failure
 
     Notes:
         - Uses env `DATABASE_URL` if set; otherwise falls back to sqlite:///sales.db.
-        - Exceptions from the database driver will propagate (e.g., syntax errors).
         - For large results, consider adding LIMIT in the query.
     """
-    engine = _get_engine()
-    with engine.begin() as connection:
-        result = connection.execute(text(query))
-        keys = list(result.keys()) if result.returns_rows else []
-        rows: List[Dict[str, Any]] = []
-        if not keys:
-            return rows
-        for r in result.fetchall():
-            rows.append({k: v for k, v in zip(keys, r)})
-        return rows
+    try:
+        engine = _get_engine()
+        with engine.begin() as connection:
+            result = connection.execute(text(query))
+            keys = list(result.keys()) if result.returns_rows else []
+            rows: List[Dict[str, Any]] = []
+            if not keys:
+                return {"status": "no_context", "rows": rows}
+            for r in result.fetchall():
+                rows.append({k: v for k, v in zip(keys, r)})
+            return {"status": "ok", "rows": rows if rows else []}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 def get_sql_tools() -> List:
