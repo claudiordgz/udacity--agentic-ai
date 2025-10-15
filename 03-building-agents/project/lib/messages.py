@@ -27,17 +27,10 @@ class ToolMessage(BaseMessage):
     content: str = ""
 
 
-class TokenUsage(BaseModel):
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-
-
 class AIMessage(BaseMessage):
     role: Literal["assistant"] = "assistant"
     content: Optional[str] = ""
     tool_calls: Optional[List[ToolCall]] = None
-    token_usage: Optional[TokenUsage] = None
 
 
 AnyMessage = Union[

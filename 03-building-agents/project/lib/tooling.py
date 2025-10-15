@@ -1,4 +1,5 @@
 import inspect
+import json
 import datetime
 from typing import (
     Any, Callable, 
@@ -7,6 +8,7 @@ from typing import (
 )
 from functools import wraps
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
+import tiktoken
 
 
 # Type alias for OpenAI's tool call implementation
@@ -29,6 +31,13 @@ class Tool:
             self._build_param_schema(key, param)
             for key, param in self.signature.parameters.items()
         ]
+
+        # Append return JSON schema (derived from type hints) to description for the model
+        ret_schema = self._build_return_schema()
+        if ret_schema:
+            ret_schema_str = json.dumps(ret_schema, indent=2, ensure_ascii=False)
+            suffix = "\n\nReturns schema:\n" + ret_schema_str
+            self.description = (self.description + suffix) if self.description else suffix
 
     def _build_param_schema(self, name: str, param: inspect.Parameter):
         param_type = self.type_hints.get(name, str)
@@ -70,6 +79,17 @@ class Tool:
                 "additionalProperties": self._infer_json_schema_type(get_args(typ)[1] if get_args(typ) else str)
             }
 
+        # Handle TypedDict-like classes (have __annotations__)
+        if inspect.isclass(typ) and hasattr(typ, "__annotations__"):
+            props = {}
+            annotations = getattr(typ, "__annotations__", {})
+            for field_name, field_type in annotations.items():
+                props[field_name] = self._infer_json_schema_type(field_type)
+            return {
+                "type": "object",
+                "properties": props,
+            }
+
         # Primitive mappings
         mapping = {
             str: "string",
@@ -81,6 +101,15 @@ class Tool:
         }
 
         return {"type": mapping.get(typ, "string")}
+
+    def _build_return_schema(self) -> Optional[dict]:
+        ret_type = self.type_hints.get('return')
+        if not ret_type:
+            return None
+        try:
+            return self._infer_json_schema_type(ret_type)
+        except Exception:
+            return None
 
     def dict(self) -> dict:
         return {
@@ -123,3 +152,47 @@ def tool(func=None, *, name: str = None, description: str = None):
     
     # @tool ou @tool(name="foo")
     return wrapper(func) if func else wrapper
+
+
+# =================== Token utilities ===================
+
+def estimate_tokens_for_payload(messages: list[dict], tools: list[dict] | None = None) -> int:
+    """Estimate token count for gpt-4o-mini payload (messages + tools).
+
+    Uses tiktoken o200k_base to approximate the input tokens. This is an estimate,
+    not an exact server-side count.
+    """
+    enc = tiktoken.get_encoding("o200k_base")
+
+    def _sanitize(obj: Any) -> Any:
+        # Drop non-serializable fields (e.g., tool_calls) and coerce unknowns to str
+        if isinstance(obj, dict):
+            return {k: _sanitize(v) for k, v in obj.items() if k != "tool_calls"}
+        if isinstance(obj, list):
+            return [_sanitize(v) for v in obj]
+        try:
+            json.dumps(obj)
+            return obj
+        except Exception:
+            return str(obj)
+
+    def _tok_len(obj: dict) -> int:
+        sanitized = _sanitize(obj)
+        return len(enc.encode(json.dumps(sanitized, ensure_ascii=False)))
+
+    total = _tok_len({"messages": messages})
+    if tools:
+        total += _tok_len({"tools": tools})
+    return total
+
+
+class ModelConfig:
+    def __init__(self, name: str, max_context_tokens: int, input_budget_tokens: int | None = None):
+        self.name = name
+        self.max_context_tokens = max_context_tokens
+        # Input budget (leave room for output). If None, default to 85% of max.
+        self.input_budget_tokens = input_budget_tokens or int(max_context_tokens * 0.85)
+
+    @staticmethod
+    def for_gpt4o_mini():
+        return ModelConfig(name="gpt-4o-mini", max_context_tokens=128_000)

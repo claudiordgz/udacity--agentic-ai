@@ -6,7 +6,7 @@ from chromadb.api.models.Collection import Collection as ChromaCollection
 from chromadb.api.types import EmbeddingFunction, QueryResult, GetResult
 import os
 
-from lib.loaders import PDFLoader
+from lib.loaders import PDFLoader, JSONLoader
 from lib.documents import Document, Corpus
 
 
@@ -253,5 +253,30 @@ class CorpusLoaderService:
         document = loader.load()
         store.add(document)
         print(f"Pages from `{pdf_path}` added!")
+
+        return store
+
+    def load_json_dir(self, store_name: str, json_path_or_dir: str) -> VectorStore:
+        """
+        Load JSON file(s) into a vector store.
+
+        If a directory is provided, all *.json files are loaded. Otherwise, a
+        single JSON file is loaded. Each JSON record becomes one Document with
+        flattened content and full metadata preserved.
+
+        Args:
+            store_name (str): Name of the vector store to create or use
+            json_path_or_dir (str): Path to a JSON file or directory of JSON files
+
+        Returns:
+            VectorStore: The vector store containing the loaded JSON content
+        """
+        store = self.manager.get_or_create_store(store_name)
+        print(f"VectorStore `{store_name}` ready!")
+
+        loader = JSONLoader(json_path_or_dir)
+        corpus = loader.load()
+        store.add(corpus)
+        print(f"JSON loaded from `{json_path_or_dir}`!")
 
         return store

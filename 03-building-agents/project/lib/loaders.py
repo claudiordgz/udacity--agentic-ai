@@ -1,4 +1,7 @@
 from typing import List
+import os
+import json
+import glob
 import pdfplumber
 from lib.documents import Corpus, Document
 
@@ -40,4 +43,70 @@ class PDFLoader:
                             content=text
                         )
                     )
+        return corpus
+
+
+class JSONLoader:
+    """
+    Document loader for reading one or many JSON files and producing a Corpus.
+
+    Expected file structure (example keys):
+      {
+        "Name": "Gran Turismo",
+        "Platform": "PlayStation 1",
+        "Genre": "Racing",
+        "Publisher": "Sony Computer Entertainment",
+        "Description": "A realistic racing simulator...",
+        "YearOfRelease": 1997
+      }
+
+    Each JSON becomes a Document where:
+      - id: filename stem (e.g., "001")
+      - content: flattened textual summary built from key fields
+      - metadata: the full JSON record
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+
+    def _iter_file_paths(self) -> List[str]:
+        if os.path.isdir(self.path):
+            return sorted(glob.glob(os.path.join(self.path, "*.json")))
+        return [self.path]
+
+    def _to_content(self, record: dict) -> str:
+        name = record.get("Name", "")
+        platform = record.get("Platform", "")
+        genre = record.get("Genre", "")
+        publisher = record.get("Publisher", "")
+        year = record.get("YearOfRelease", record.get("Year", ""))
+        description = record.get("Description", "")
+        parts = [
+            f"Name: {name}",
+            f"Platform: {platform}",
+            f"Genre: {genre}",
+            f"Publisher: {publisher}",
+            f"Year: {year}",
+            f"Description: {description}",
+        ]
+        return "\n".join(p for p in parts if p and not p.endswith(": "))
+
+    def load(self) -> Corpus:
+        corpus = Corpus()
+        for file_path in self._iter_file_paths():
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                doc_id = os.path.splitext(os.path.basename(file_path))[0]
+                content = self._to_content(data)
+                corpus.append(
+                    Document(
+                        id=doc_id,
+                        content=content,
+                        metadata=data,
+                    )
+                )
+            except Exception as e:
+                # Skip bad files but continue loading others
+                print(f"Skipping {file_path}: {e}")
         return corpus

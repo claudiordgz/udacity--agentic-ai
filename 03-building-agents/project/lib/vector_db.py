@@ -4,8 +4,9 @@ import chromadb
 from chromadb.utils import embedding_functions
 from chromadb.api.models.Collection import Collection as ChromaCollection
 from chromadb.api.types import EmbeddingFunction, QueryResult, GetResult
+import os
 
-from lib.loaders import PDFLoader
+from lib.loaders import PDFLoader, JSONLoader
 from lib.documents import Document, Corpus
 
 
@@ -66,7 +67,7 @@ class VectorStore:
             metadatas=item_dict["metadatas"]
         )
 
-    def query(self, query_texts: str | List[str], n_results: int = 3,
+    def query(self, query_texts: List[str], n_results: int = 3,
               where: Optional[Dict[str, Any]] = None,
               where_document: Optional[Dict[str, Any]] = None) -> QueryResult:
         """
@@ -159,8 +160,12 @@ class VectorStoreManager:
         self.embedding_function = self._create_embedding_function(openai_api_key)
 
     def _create_embedding_function(self, api_key: str) -> EmbeddingFunction:
+        api_base = os.getenv("OPENAI_BASE_URL", "https://openai.vocareum.com/v1")
+        model_name = os.getenv("CHROMA_EMBED_MODEL", "text-embedding-ada-002")
         embeddings_fn = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=api_key
+            api_key=api_key,
+            api_base=api_base,
+            model_name=model_name,
         )
         return embeddings_fn
 
@@ -248,5 +253,30 @@ class CorpusLoaderService:
         document = loader.load()
         store.add(document)
         print(f"Pages from `{pdf_path}` added!")
+
+        return store
+
+    def load_json_dir(self, store_name: str, json_path_or_dir: str) -> VectorStore:
+        """
+        Load JSON file(s) into a vector store.
+
+        If a directory is provided, all *.json files are loaded. Otherwise, a
+        single JSON file is loaded. Each JSON record becomes one Document with
+        flattened content and full metadata preserved.
+
+        Args:
+            store_name (str): Name of the vector store to create or use
+            json_path_or_dir (str): Path to a JSON file or directory of JSON files
+
+        Returns:
+            VectorStore: The vector store containing the loaded JSON content
+        """
+        store = self.manager.get_or_create_store(store_name)
+        print(f"VectorStore `{store_name}` ready!")
+
+        loader = JSONLoader(json_path_or_dir)
+        corpus = loader.load()
+        store.add(corpus)
+        print(f"JSON loaded from `{json_path_or_dir}`!")
 
         return store

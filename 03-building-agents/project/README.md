@@ -1,53 +1,94 @@
-# README Template
+# UdaPlay: AI Game Research Agent
 
-Below is a template provided for use when building your README file for students.
-
-# Project Title
-
-Project description goes here.
+UdaPlay is an AI assistant for game research that answers questions using a local vector database (RAG), falls back to web search when needed, keeps conversation history, and persists useful facts in long‑term memory.
 
 ## Getting Started
 
-Instructions for how to get a copy of the project running on your local machine.
-
 ### Dependencies
 
+Python 3.11+
+
+Required packages (already pinned in the repo):
+- chromadb, openai, tavily-python, python-dotenv, tiktoken, pdfplumber, sqlalchemy, pydantic
+
+### Environment
+
+Create a `.env` file at repo root:
 ```
-Examples here
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=https://openai.vocareum.com/v1
+TAVILY_API_KEY=...
 ```
 
-### Installation
-
-Step by step explanation of how to get a dev environment running.
-
-List out the steps
-
+Optional for SQL tools and embeddings:
 ```
-Give an example here
+DATABASE_URL=sqlite:///./app.db
+CHROMA_EMBED_MODEL=text-embedding-ada-002
+```
+
+### Setup
+1) Create venv and install deps
+```
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt  # or use pyproject/poetry if preferred
+```
+
+2) Ensure the notebooks can import `lib`:
+- We work under `03-building-agents/project/`. Notebooks reference `lib/*` directly.
+
+### Data Ingestion
+
+The games corpus lives in `project/games/*.json`. Use the notebook `Udaplay_02_starter_project.ipynb` to:
+- Initialize Chroma persistent client
+- Load JSON corpus via `CorpusLoaderService.load_json_dir("games_market", "./games")`
+
+### Run the Agent (Notebook)
+
+Open `Udaplay_02_starter_project.ipynb` and run cells in order:
+- Tools: `retrieve_game`, `evaluate_retrieval`, `game_web_search`
+- Agent setup with `include_tool_docs` and strict validation
+- Long‑term memory (`store_memory`, `search_memory`)
+- Orchestrator demo (optional)
+- Agent trace cells to inspect tools, args, and tokens
+
+### Example Queries
+- "When were Pokémon Gold and Silver released?"
+- "Which was the first 3D platformer Mario game?"
+- "Was Mortal Kombat X released for PlayStation 5?"
+
+### Sessions and Memory
+The agent remembers prior context within the same `session_id` using short‑term memory. Use a consistent `session_id` across turns:
+```python
+agent = Agent(model_name="gpt-4o-mini", tools=[...], instructions="...")
+
+# First message
+run1 = agent.invoke("Summarize Gran Turismo history", session_id="execs")
+
+# Follow-up uses prior context automatically
+run2 = agent.invoke("And what platform did it debut on?", session_id="execs")
+
+# Reset a session if needed
+agent.reset_session("execs")
 ```
 
 ## Testing
 
-Explain the steps needed to run any automated tests
+Use the evaluation utilities in `lib/evaluation.py` (or the demo code in the notebook) to:
+- Measure black-box correctness
+- Inspect single-step tool selection
+- Analyze trajectory metrics (steps, tokens, cost estimate)
 
-### Break Down Tests
-
-Explain what each test does and why
-
-```
-Examples here
-```
-## Project Instructions
-
-This section should contain all the student deliverables for this project.
+## Project Instructions (Deliverables)
+- Implement and document the three tools (retrieve, evaluate, web search)
+- Build the Agent with memory and run example queries
+- Add curated facts to long‑term memory and verify retrieval
+- Provide an Agent trace for at least three queries (tools + tokens)
 
 ## Built With
-
-* [Item1](www.item1.com) - Description of item
-* [Item2](www.item2.com) - Description of item
-* [Item3](www.item3.com) - Description of item
-
-Include all items used to build project.
+- ChromaDB (vector storage)
+- OpenAI (chat + embeddings)
+- Tavily (web search)
+- Pydantic, dotenv, tiktoken
 
 ## License
 [License](../LICENSE.md)

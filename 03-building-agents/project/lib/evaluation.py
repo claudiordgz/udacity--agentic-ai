@@ -34,6 +34,7 @@ class SystemMetrics(BaseModel):
     tool_call_latency: float = Field(description="Average tool call latency")
     memory_usage: Optional[float] = Field(description="Memory usage if tracked", default=None)
     cost_estimate: Optional[float] = Field(description="Estimated cost in USD", default=None)
+    per_step_tokens: Optional[List[int]] = Field(description="Tokens used per LLM step", default=None)
 
 class EvaluationResult(BaseModel):
     """Complete evaluation result"""
@@ -256,7 +257,18 @@ class AgentEvaluator:
         ]
         steps_taken = len(actual_steps)
         messages = final_state.get("messages", [])
-        total_tokens = final_state.get("total_tokens", 0)
+        total_tokens = final_state.get("cumulative_tokens", final_state.get("total_tokens", 0))
+
+        # Per-step token accounting (LLM steps only)
+        per_step_tokens: List[int] = []
+        for snap in run.snapshots:
+            if snap.step_id == "llm_processor":
+                try:
+                    tok = snap.state_data.get("total_tokens")
+                    if tok is not None:
+                        per_step_tokens.append(int(tok))
+                except Exception:
+                    pass
         
         # Count tool calls in the trajectory
         tool_calls_made = []
@@ -300,7 +312,8 @@ class AgentEvaluator:
             total_tokens=total_tokens,
             execution_time=execution_time,
             tool_call_latency=execution_time / max(len(tool_calls_made), 1),
-            cost_estimate=self._estimate_cost(total_tokens)
+            cost_estimate=self._estimate_cost(total_tokens),
+            per_step_tokens=per_step_tokens or None,
         )
         
         # Calculate overall score
