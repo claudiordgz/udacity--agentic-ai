@@ -212,3 +212,4 @@ __marimo__/
 **/*/reports/phase2/*.err.txt
 **/*/reports/phase2/*.out.txt
 **/*/reports/phase2/*.exitcode
+.chroma

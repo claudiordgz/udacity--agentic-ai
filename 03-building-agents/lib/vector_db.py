@@ -67,6 +67,12 @@ class VectorStore:
             metadatas=item_dict["metadatas"]
         )
 
+    def count(self) -> int:
+        """
+        Return the number of items stored in this collection.
+        """
+        return self._collection.count()
+
     def query(self, query_texts: List[str], n_results: int = 3,
               where: Optional[Dict[str, Any]] = None,
               where_document: Optional[Dict[str, Any]] = None) -> QueryResult:
@@ -156,7 +162,28 @@ class VectorStoreManager:
     """
 
     def __init__(self, openai_api_key: str):
-        self.chroma_client = chromadb.Client()
+        # Enable persistence: default to ./games/.chroma if env not set
+        persist_dir = os.getenv("CHROMA_PERSIST_DIR")
+        if not persist_dir:
+            default_dir = os.path.join(os.getcwd(), "games", ".chroma")
+            try:
+                os.makedirs(default_dir, exist_ok=True)
+            except Exception:
+                pass
+            persist_dir = default_dir
+
+        try:
+            # Preferred in newer Chroma versions
+            self.chroma_client = chromadb.PersistentClient(path=persist_dir)
+        except Exception:
+            # Fallback to legacy Settings-based init
+            from chromadb.config import Settings  # type: ignore
+            self.chroma_client = chromadb.Client(
+                Settings(
+                    chroma_db_impl="duckdb+parquet",
+                    persist_directory=persist_dir,
+                )
+            )
         self.embedding_function = self._create_embedding_function(openai_api_key)
 
     def _create_embedding_function(self, api_key: str) -> EmbeddingFunction:
@@ -205,6 +232,23 @@ class VectorStoreManager:
             self.chroma_client.delete_collection(name=store_name)
         except Exception:
             pass  # Store doesn't exist yet
+
+    def list_store_names(self) -> List[str]:
+        """
+        List available Chroma collections by name.
+        """
+        try:
+            cols = self.chroma_client.list_collections()
+            names: List[str] = []
+            for c in cols:
+                name = getattr(c, "name", None)
+                if name is None and isinstance(c, dict):
+                    name = c.get("name")
+                if name:
+                    names.append(str(name))
+            return names
+        except Exception:
+            return []
 
 
 class CorpusLoaderService:
