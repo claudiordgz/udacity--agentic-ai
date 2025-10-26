@@ -1,17 +1,15 @@
 """
 Main entry point for the Skate Park & Shop System Exercise.
 
-INSTRUCTIONS:
-1. Implement the OrchestratorAgent.run() method in agents/orchestrator/orchestrator.py
-2. The orchestrator should:
-   - Check stock using InventoryAgent tools first
-   - Use conditional branching based on request["action"] (purchase vs inquire)
-   - If purchase and in stock, delegate to SalesAgent tools
-   - If inquire, return stock information without selling
-3. Test with the sample requests at the bottom
+Modes:
+- UI mode: python main.py
+- Automated tests: python main.py --test
+- Evaluator: python main.py --evaluate
 """
 
 from agents.orchestrator.orchestrator import OrchestratorAgent
+from ui import UI
+import sys
 
 def test_system():
     """Test the orchestration system with various requests."""
@@ -82,5 +80,18 @@ def test_system():
     print("=" * 60)
 
 if __name__ == "__main__":
-    test_system()
+    orchestrator = OrchestratorAgent()
+    
+    # Check command line arguments
+    if len(sys.argv) > 1 and sys.argv[1] == "--evaluate":
+        # Run evaluator (comprehensive test suite)
+        from evaluator import run_evaluation
+        run_evaluation()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--test":
+        # Run automated tests
+        test_system()
+    else:
+        # Run interactive UI
+        ui = UI()
+        ui.run(orchestrator)
 

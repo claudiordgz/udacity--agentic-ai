@@ -4,19 +4,21 @@
 
 ```
 exercise/
-├── main.py                          # Main entry point with tests
+├── main.py                          # Main entry point (UI mode and tests)
+├── ui.py                            # Interactive user interface
+├── config.py                        # LLM configuration
 ├── data/                            # Data layer
 │   └── inventory.py                 # Inventory data management
 └── agents/                          # Agent implementations
     ├── inventory/
     │   ├── __init__.py
-    │   └── tools.py                 # Inventory compr_tool functions
+    │   └── tools.py                 # InventoryAgent + tools
     ├── sales/
     │   ├── __init__.py
-    │   └── tools.py                 # Sales tool functions
+    │   └── tools.py                 # SalesAgent + tools
     └── orchestrator/
         ├── __init__.py
-        └── orchestrator.py          # Main orchestrator logic (LLM-powered)
+        └── orchestrator.py          # OrchestratorAgent (routes to other agents)
 ```
 
 ## Instructions
@@ -41,10 +43,14 @@ exercise/
                                                 └─ Not in stock → Error
    ```
 
-3. **Test** by running:
-   ```bash
-   python main.py
-   ```
+3. **Run the system:**
+   - Interactive UI mode: `python main.py`
+   - Automated tests: `python main.py --test`
+
+The UI displays available items from the inventory and lets you:
+- Browse current stock levels
+- Inquire about specific items
+- Purchase items (only if in stock)
 
 ## Key Concepts
 
