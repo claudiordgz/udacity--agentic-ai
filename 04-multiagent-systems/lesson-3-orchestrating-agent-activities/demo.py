@@ -5,7 +5,7 @@ from smolagents import ToolCallingAgent, OpenAIServerModel, tool
 from datetime import datetime, timedelta
 
 dotenv.load_dotenv(dotenv_path="../.env")
-openai_api_key = os.getenv("UDACITY_OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
 model = OpenAIServerModel(
     model_id="gpt-4o-mini",
@@ -233,9 +233,8 @@ class Orchestrator(ToolCallingAgent):
         self.customer_support = CustomerSupportAgent(model)
         self.inventory = InventoryAgent(model)
         self.park_management = ParkManagementAgent(model)
-
-    @tool
-    def handle_request(user_request: str) -> str:
+    
+    def handle_request(self, user_request: str) -> str:
         """Handle a customer request and delegate to the appropriate agent.
 
         Args:
@@ -249,14 +248,14 @@ class Orchestrator(ToolCallingAgent):
 
         if "Shop" in diagnosis:
             if "Skateboard" in diagnosis:
-                return self.inventory.run(f"""Check the stock level of skateboards and respond to the customer: {initial_response}""")
+                return self.inventory.run(f"""Customer is asking about skateboards. Check the stock level for 'skateboard' item and provide an accurate response about availability.""")
             elif "Gear" in diagnosis:
                 return f"Delegate to repair services. {initial_response}"
             else:
                 return "Cannot assist with your request directly. Please rephrase your request."
 
         elif "Park" in diagnosis:
-            return self.park_management.run(f"""Check booking availability and respond to the customer: {initial_response}""")
+            return self.park_management.run(f"""Customer request: "{user_request}". Check availability and respond with booking options for the requested date and time.""")
         else:
             return "Cannot assist with your request directly. Please rephrase your request."
 
@@ -265,13 +264,13 @@ orchestrator = Orchestrator(model)
 print("\n--- Demo in Action! ---\n")
 
 request1 = "I want to book a skate session for 2024-07-28 at 10:00."
-response1 = orchestrator.run(f"""{request1}""")
+response1 = orchestrator.handle_request(request1)
 print(f"Response 1: {response1}")
 
 request2 = "Do you have any skateboards?"
-response2 = orchestrator.run(f"""{request2}""")
+response2 = orchestrator.handle_request(request2)
 print(f"Response 2: {response2}")
 
 request3 = "My helmet is broken!"
-response3 = orchestrator.run(f"""{request3}""")
+response3 = orchestrator.handle_request(request3)
 print(f"Response 3: {response3}")
