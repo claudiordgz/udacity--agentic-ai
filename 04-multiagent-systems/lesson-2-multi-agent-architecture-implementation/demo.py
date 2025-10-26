@@ -8,7 +8,7 @@ load_dotenv()
 
 model = OpenAIServerModel(
     model_id="gpt-4o-mini",
-    api_key=os.getenv("UDACITY_OPENAI_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY"),
     api_base="https://openai.vocareum.com/v1",
 )
 
@@ -191,7 +191,7 @@ class PenguinAgent(ToolCallingAgent):
 
 def run_simulation():
     scientist = ScientistAgent(initial_food_supply=20, refresh_interval=5)
-    penguins = [PenguinAgent(f"Penguin {i}") for i in range(4)]
+    penguins = [PenguinAgent(f"Penguin_{i}") for i in range(4)]
     
     print("\nStarting Simulation...")
     for round in range(3):

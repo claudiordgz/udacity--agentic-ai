@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from smolagents import ToolCallingAgent, OpenAIServerModel, tool
-from typing import Dict, Any, List
+from typing import Dict, Any, List, TypedDict, Literal
 import json
 import random
 
@@ -9,26 +9,61 @@ load_dotenv()
 
 model = OpenAIServerModel(
     model_id="gpt-4o-mini",
-    api_key=os.getenv("UDACITY_OPENAI_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY"),
     api_base="https://openai.vocareum.com/v1",
 )
+
+# Type definitions
+class PenguinAction(TypedDict, total=False):
+    action: Literal["request_food", "find_food"]
+    method: Literal["fishing", "foraging"]
+
+class ScientistDecision(TypedDict):
+    give_food: int  # 0-5
+    give_tool: bool
+
+class PenguinHistory(TypedDict):
+    recent_food: int
+    has_tool: bool
 
 # Global state for simplicity
 DISTRIBUTION_HISTORY = {}
 @tool
-def check_history(penguin_name: str) -> Dict[str, Any]:
+def check_history(penguin_name: str) -> PenguinHistory:
     """
     Check the recent resource distribution history for a specific penguin.
+    
+    Args:
+        penguin_name: The unique name or identifier of the penguin 
+                     whose resource distribution history will be 
+                     retrieved and analyzed.
+    
+    Returns:
+        PenguinHistory: A dictionary containing:
+            - 'recent_food' (int): Total food received in the last 3 rounds
+            - 'has_tool' (bool): Whether the penguin has possessed a tool 
+                               in recent history
     """
     history = DISTRIBUTION_HISTORY.get(penguin_name, [])
     recent_food = sum(h["food"] for h in history[-3:]) if history else 0
     has_tool = any(h["has_tool"] for h in history) if history else False
-    return {"recent_food": recent_food, "has_tool": has_tool}
+    return {"recent_food": recent_food, "has_tool": has_tool}  # type: PenguinHistory
 
 @tool
 def record_distribution(penguin_name: str, food: int, has_tool: bool) -> str:
     """
-    Record the distribution of resources.
+    Record the distribution of resources to a specific penguin.
+    
+    Args:
+        penguin_name: The unique name or identifier of the penguin 
+                     receiving resources.
+        food: The number of food units being given to the penguin.
+              Must be an integer between 0 and 5.
+        has_tool: A flag indicating whether a tool is being distributed.
+                  True means a tool is given, False means no tool is given.
+    
+    Returns:
+        str: A confirmation message describing the resource distribution.
     """
     if penguin_name not in DISTRIBUTION_HISTORY:
         DISTRIBUTION_HISTORY[penguin_name] = []
@@ -82,7 +117,7 @@ class ScientistAgent(ToolCallingAgent):
         print(f"Food Supply Reset to: {self.food_supply}")
         print(f"Tool Availability Reset to: {self.tool_available}")
 
-    def respond_to_action(self, penguin: 'PenguinAgent', penguin_action: Dict[str, Any]) -> None:
+    def respond_to_action(self, penguin: 'PenguinAgent', penguin_action: PenguinAction) -> None:
         """Respond to a penguin's action."""
         self.turn_counter += 1
         if self.turn_counter % self.refresh_interval == 0:
@@ -116,15 +151,20 @@ class ScientistAgent(ToolCallingAgent):
         )
 
         try:
-            # Check if response is already a dictionary
+            # Parse the scientist's decision
             if isinstance(response, dict):
-                decision = response
+                decision_data = response
             else:
-                # If it's a string, try to parse the JSON
-                decision = json.loads(response.split("final_answer:")[-1].strip())
+                decision_data = json.loads(response.split("final_answer:")[-1].strip())
+            
+            # Type the decision
+            decision: ScientistDecision = {
+                "give_food": min(int(decision_data.get('give_food', 0)), self.food_supply),
+                "give_tool": bool(decision_data.get('give_tool', False)) and self.tool_available
+            }
 
-            food = min(int(decision.get('give_food', 0)), self.food_supply)
-            tool = decision.get('give_tool', False) and self.tool_available
+            food = decision["give_food"]
+            tool = decision["give_tool"]
 
             print(f"\nScientist's Decision:")
             print(f"  - Food to Give: {food}")
@@ -152,35 +192,69 @@ class ScientistAgent(ToolCallingAgent):
 
 class PenguinAgent(ToolCallingAgent):
     def __init__(self, name: str) -> None:
-        # YOUR CODE HERE - add a tool here, or change existing ones!
-        super().__init__(tools=["YOUR NEW TOOL HERE"], model=model, name=name)
+        # Penguins don't use tools - they make decisions that are processed externally
+        super().__init__(tools=[], model=model, name=name)
         self.name = name
         self.food = 0
         self.has_tool = False
+        self.is_hungry = True  # Penguins start hungry
 
-    def take_action(self) -> Dict[str, Any]:
+    def take_action(self) -> PenguinAction:
         """Penguin decides on an action each round."""
         history = check_history(self.name)
 
         # YOUR CODE HERE
         # ****************************************************
-        prompt = f"""You are Penguin {self.name}.
-        You have {self.food} food.
-        What do you want to do? Respond with JSON:  {{'action': '<action_string>', 'method': '<method_string>'}}"""
+        # Determine if penguin should be hungry based on food level
+        # Penguin needs at least 1 food to not be hungry
+        self.is_hungry = self.food < 1
+        
+        if not self.is_hungry:
+            print(f"{self.name} is not hungry (has {self.food} food).")
+            return {"action": "request_food", "method": "foraging"}  # Just request food but not urgent
+        
+        prompt = f"""You are Penguin {self.name}. You are HUNGRY and need food.
+        
+        Your current state:
+        - Food: {self.food} (you need at least 1 to not be hungry)
+        - Has Tool: {self.has_tool}
+        - Is Hungry: {self.is_hungry}
+        
+        Your recent history:
+        - Recent Food Received: {history['recent_food']}
+        - Has Had Tool: {history['has_tool']}
+        
+        Decide on an action:
+        1. "request_food" - Request food from the scientist (may get 0-5 food, and possibly a tool)
+        2. "find_food" - Search for food yourself using either:
+           - "fishing" (finds 2-7 food, more reliable)
+           - "foraging" (finds 0-3 food, less reliable)
+        
+        Respond with JSON: {{"action": "<request_food|find_food>", "method": "<fishing|foraging>"}}"""
 
         response = self.run(prompt)
         # ****************************************************
 
         try:
-            action = json.loads(response.split("final_answer:")[-1].strip())
+            # Parse JSON response
+            if isinstance(response, dict):
+                action_data = response
+            else:
+                action_data = json.loads(response.split("final_answer:")[-1].strip())
+            
+            # Validate and construct typed dict
+            action: PenguinAction = {
+                "action": action_data.get("action", "request_food"),
+                "method": action_data.get("method", "foraging")
+            }
             return action
-        except json.JSONDecodeError:
-            print(f"Error processing {self.name}'s action")
-            return {"action": "request_food", "details": "default safe action"}
+        except (json.JSONDecodeError, AttributeError) as e:
+            print(f"Error processing {self.name}'s action: {e}")
+            return {"action": "request_food"}  # type: ignore
 
 def run_simulation():
     scientist = ScientistAgent(initial_food_supply=20, refresh_interval=5)
-    penguins = [PenguinAgent(f"Penguin {i}") for i in range(4)]
+    penguins = [PenguinAgent(f"Penguin_{i}") for i in range(4)]
 
     print("\nStarting Simulation...")
     for round in range(3):
