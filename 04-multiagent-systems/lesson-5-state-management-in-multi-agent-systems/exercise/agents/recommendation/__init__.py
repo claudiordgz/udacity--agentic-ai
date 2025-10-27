@@ -1,5 +1,5 @@
 """Recommendation agent module."""
 
-from .tools import RecommendationAgent
+from .recommendation_agent import RecommendationAgent
 
 __all__ = ["RecommendationAgent"]

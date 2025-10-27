@@ -1,5 +1,5 @@
 """Sales agent module."""
 
-from .tools import SalesAgent
+from .sales_agent import SalesAgent
 
 __all__ = ["SalesAgent"]

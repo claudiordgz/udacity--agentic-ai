@@ -1,10 +1,6 @@
 """Tools for the RecommendationAgent."""
 
-from typing import Dict, Any, List
 from smolagents import tool
-import sys
-sys.path.append('../..')
-from config import model
 
 
 @tool
@@ -61,19 +57,4 @@ def generate_recommendation(customer_id: str) -> str:
         return "Since you liked lulo, you might enjoy granadilla! It has a sweet and seedy texture."
     else:
         return "Based on your purchase history, we have a great selection of tropical fruits today! Try something new!"
-
-
-from smolagents import ToolCallingAgent
-
-
-class RecommendationAgent(ToolCallingAgent):
-    """Agent for providing personalized recommendations using LLM reasoning."""
-    
-    def __init__(self):
-        super().__init__(
-            tools=[get_purchase_history, generate_recommendation],
-            model=model,
-            name="recommendation_agent",
-            description="Agent that provides personalized fruit recommendations based on customer purchase history."
-        )
 
