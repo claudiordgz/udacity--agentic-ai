@@ -18,7 +18,7 @@ import dotenv
 
 # Note: Make sure to set up your .env file with your API key before running
 dotenv.load_dotenv(dotenv_path='../.env')
-openai_api_key = os.getenv('UDACITY_OPENAI_API_KEY')
+openai_api_key = os.getenv('OPENAI_API_KEY')
 
 model = OpenAIServerModel(
     model_id='gpt-4o-mini',
