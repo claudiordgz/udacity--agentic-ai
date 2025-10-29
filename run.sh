@@ -43,7 +43,7 @@ cmd="$1"; shift || true
 case "$cmd" in
   jn|notebook) load_openai_key; poetry run jupyter notebook "$@";;
   shell)       load_openai_key; poetry run python "$@";;
-  test)        load_openai_key; poetry run pytest "$@";;
+  test)        poetry run pytest "$@";;
   "")          load_openai_key; poetry run python - <<'PY'
 import os, textwrap, sys
 print(textwrap.dedent(f"""

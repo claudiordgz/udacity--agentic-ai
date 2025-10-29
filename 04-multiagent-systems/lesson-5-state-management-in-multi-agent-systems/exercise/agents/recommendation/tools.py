@@ -1,7 +1,7 @@
 """Tools for the RecommendationAgent."""
 
 from smolagents import tool
-
+from data.market_state import market_state
 
 @tool
 def get_purchase_history(customer_id: str) -> str:
@@ -14,7 +14,6 @@ def get_purchase_history(customer_id: str) -> str:
     Returns:
         A summary of the customer's purchase history
     """
-    from data.market_state import market_state
     purchase_history = market_state["purchase_history"]
     
     if customer_id not in purchase_history or not purchase_history[customer_id]:
@@ -36,7 +35,6 @@ def generate_recommendation(customer_id: str) -> str:
     Returns:
         A personalized recommendation message
     """
-    from data.market_state import market_state
     purchase_history = market_state["purchase_history"]
     
     # Check if customer has purchase history
