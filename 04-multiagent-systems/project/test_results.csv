@@ -1,0 +1,93 @@
+request_id,request_date,quote_total,cash_balance,cash_delta,inventory_value,fulfilled,restock_required,negotiated,response_text
+1,2025-04-01,40.0,45059.7,0.0,4940.299999999999,True,False,False,"Quote prepared for requested items:
+- 200 units of Glossy paper @ $0.20
+Proposed total: $40.00 (discount applied: Base cost computed from unit pricing: $40.00; Bulk discount applied: 0%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $45059.70 | Inventory value: $4940.30"
+2,2025-04-03,99.75,44919.7,-140.0,4940.299999999999,True,False,True,"Quote prepared for requested items:
+- 375 units of Poster paper @ $0.25
+- 225 units of Party streamers @ $0.05
+Proposed total: $99.75 (discount applied: Base cost computed from unit pricing: $105.00; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44919.70 | Inventory value: $4940.30"
+3,2025-04-04,0.0,44919.7,0.0,4940.299999999999,True,False,False,"Quote prepared for requested items:
+- 0 units of A4 paper @ $0.05
+- 0 units of A4 paper @ $0.05
+Proposed total: $0.00 (discount applied: Base cost computed from unit pricing: $0.00; Bulk discount applied: 0%; Historical reference for similar jobs: $3441.67)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44919.70 | Inventory value: $4940.30"
+4,2025-04-05,0.0,44919.7,0.0,4940.299999999999,False,False,True,Could not parse item list from request. No quote generated; escalate to a sales representative.
+5,2025-04-05,47.5,44919.7,0.0,4940.299999999999,True,False,False,"Quote prepared for requested items:
+- 500 units of Colored paper @ $0.10
+Proposed total: $47.50 (discount applied: Base cost computed from unit pricing: $50.00; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44919.70 | Inventory value: $4940.30"
+6,2025-04-06,71.96249999999999,44818.7,-101.0,4940.299999999999,True,False,True,"Quote prepared for requested items:
+- 375 units of Construction paper @ $0.07
+- 225 units of Glitter paper @ $0.22
+Proposed total: $71.96 (discount applied: Base cost computed from unit pricing: $75.75; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44818.70 | Inventory value: $4940.30"
+7,2025-04-07,243.8,44598.7,-220.0,4940.299999999999,True,False,True,"Quote prepared for requested items:
+- 500 units of Glossy paper @ $0.20
+- 750 units of Matte paper @ $0.18
+- 150 units of Heavyweight paper @ $0.20
+Proposed total: $243.80 (discount applied: Base cost computed from unit pricing: $265.00; Bulk discount applied: 8%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44598.70 | Inventory value: $4940.30"
+8,2025-04-07,517.44,44237.5,-361.1999999999971,5061.499999999999,True,False,True,"Quote prepared for requested items:
+- 500 units of Glossy paper @ $0.20
+- 1000 units of Matte paper @ $0.18
+- 1400 units of Colored paper @ $0.10
+- 2100 units of Recycled paper @ $0.08
+Proposed total: $517.44 (discount applied: Base cost computed from unit pricing: $588.00; Bulk discount applied: 12%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44237.50 | Inventory value: $5061.50"
+9,2025-04-07,64.0,44237.5,0.0,5061.499999999999,True,False,False,"Quote prepared for requested items:
+- 200 units of Glitter paper @ $0.22
+- 100 units of Glossy paper @ $0.20
+Proposed total: $64.00 (discount applied: Base cost computed from unit pricing: $64.00; Bulk discount applied: 0%; Historical reference for similar jobs: $9040.00)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44237.50 | Inventory value: $5061.50"
+13,2025-04-08,0.0,44237.5,0.0,5061.499999999999,False,False,True,Could not parse item list from request. No quote generated; escalate to a sales representative.
+12,2025-04-08,42.75,44217.5,-20.0,5061.499999999999,True,False,True,"Quote prepared for requested items:
+- 200 units of Cardstock @ $0.15
+- 375 units of Standard copy paper @ $0.04
+Proposed total: $42.75 (discount applied: Base cost computed from unit pricing: $45.00; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44217.50 | Inventory value: $5061.50"
+10,2025-04-08,0.0,44217.5,0.0,5061.499999999999,False,False,True,Could not parse item list from request. No quote generated; escalate to a sales representative.
+11,2025-04-08,0.0,44217.5,0.0,5061.499999999999,False,False,True,Could not parse item list from request. No quote generated; escalate to a sales representative.
+14,2025-04-09,0.0,44217.5,0.0,5061.499999999999,True,False,False,"Quote prepared for requested items:
+- 0 units of A4 paper @ $0.05
+Proposed total: $0.00 (discount applied: Base cost computed from unit pricing: $0.00; Bulk discount applied: 0%; Historical reference for similar jobs: $4307.33)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44217.50 | Inventory value: $5061.50"
+15,2025-04-12,0.0,44217.5,0.0,5061.499999999999,True,False,False,"Quote prepared for requested items:
+- 0 units of A4 paper @ $0.05
+Proposed total: $0.00 (discount applied: Base cost computed from unit pricing: $0.00; Bulk discount applied: 0%; Historical reference for similar jobs: $4307.33)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44217.50 | Inventory value: $5061.50"
+16,2025-04-13,132.04999999999998,44217.5,0.0,5061.499999999999,True,False,False,"Quote prepared for requested items:
+- 500 units of Poster paper @ $0.25
+- 200 units of Construction paper @ $0.07
+Proposed total: $132.05 (discount applied: Base cost computed from unit pricing: $139.00; Bulk discount applied: 5%; Historical reference for similar jobs: $7678.40)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44217.50 | Inventory value: $5061.50"
+17,2025-04-14,156.75,44063.5,-154.0,5061.499999999999,True,False,True,"Quote prepared for requested items:
+- 750 units of Glitter paper @ $0.22
+Proposed total: $156.75 (discount applied: Base cost computed from unit pricing: $165.00; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44063.50 | Inventory value: $5061.50"
+18,2025-04-14,28.5,44043.5,-20.0,5061.499999999999,True,False,True,"Quote prepared for requested items:
+- 750 units of Standard copy paper @ $0.04
+Proposed total: $28.50 (discount applied: Base cost computed from unit pricing: $30.00; Bulk discount applied: 5%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $44043.50 | Inventory value: $5061.50"
+19,2025-04-15,431.48,43670.9,-372.59999999999854,5344.099999999999,True,False,True,"Quote prepared for requested items:
+- 1400 units of Glossy paper @ $0.20
+- 1050 units of Matte paper @ $0.18
+Proposed total: $431.48 (discount applied: Base cost computed from unit pricing: $469.00; Bulk discount applied: 8%)
+Existing inventory covers the request; no restock needed.
+Post-order cash balance: $43670.90 | Inventory value: $5344.10"
+20,2025-04-17,0.0,43670.9,0.0,5344.099999999999,False,False,True,Could not parse item list from request. No quote generated; escalate to a sales representative.

@@ -1,0 +1,18 @@
+[project]
+name = "suppy-and-customer-agent-system"
+version = "0.1.0"
+description = "Design and implement a multi-agent solution, restricted to at most five agents, capable of handling inquiries, checking inventory status, providing accurate quotations, and completing transactions seamlessly."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy>=2.3.4",
+    "openai>=2.6.1",
+    "pandas>=2.3.3",
+    "smolagents>=1.22.0",
+    "sqlalchemy>=2.0.44",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
