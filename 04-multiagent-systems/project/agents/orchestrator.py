@@ -89,7 +89,13 @@ class BusinessOrchestrator(ToolCallingAgent):
 
         inventory_overview = self.inventory_agent.summarize_inventory(request_date)
         restock_plan = self.inventory_agent.restock_plan(parsed_items, request_date)
-        quote = self.quoting_agent.build_quote(parsed_items, _context_terms_from_request(request_text))
+        alternative_candidates = self.inventory_agent.suggest_alternatives(parsed_items, restock_plan, request_date)
+        alternative_suggestions = alternative_candidates.get("suggestions", [])
+        quote = self.quoting_agent.build_quote(
+            parsed_items,
+            _context_terms_from_request(request_text),
+            alternative_suggestions=alternative_suggestions,
+        )
 
         orders = {
             "success": True,
@@ -113,7 +119,16 @@ class BusinessOrchestrator(ToolCallingAgent):
 
         fulfilled = not restock_plan["restock_required"] or orders.get("success", False)
 
-        response_text = _summarise_response(parsed_items, quote, restock_plan, orders, report, fulfilled)
+        alternative_quotes = quote.get("alternatives", [])
+        response_text = _summarise_response(
+            parsed_items,
+            quote,
+            restock_plan,
+            orders,
+            report,
+            fulfilled,
+            alternative_quotes=alternative_quotes,
+        )
         return {
             "items": items_payload,
             "quote": quote,
@@ -123,6 +138,7 @@ class BusinessOrchestrator(ToolCallingAgent):
             "inventory_overview": inventory_overview,
             "fulfilled": fulfilled,
             "response_text": response_text,
+            "inventory_alternatives": alternative_suggestions,
         }
 
 
@@ -142,6 +158,7 @@ def _summarise_response(
     orders: Dict | None,
     report: Dict,
     fulfilled: bool,
+    alternative_quotes: List[Dict] | None = None,
 ) -> str:
     lines = [
         "Quote prepared for requested items:",
@@ -163,6 +180,16 @@ def _summarise_response(
             lines.append(f"Restock could not be completed: {reason}")
     else:
         lines.append("Existing inventory covers the request; no restock needed.")
+
+    alternative_options = alternative_quotes or quote.get("alternatives", [])
+    if alternative_options:
+        lines.append("Alternative packages to avoid restock delays:")
+        for option in alternative_options:
+            savings = option.get("savings_vs_primary")
+            savings_clause = f" (saves ${savings:.2f})" if isinstance(savings, (int, float)) and savings else ""
+            lines.append(
+                f"  * {option.get('label', 'Alternative')}: ${option.get('total', 0.0):.2f}{savings_clause}"
+            )
 
     lines.append(
         f"Post-order cash balance: ${report['cash_balance']:.2f} | Inventory value: ${report['inventory_value']:.2f}"

@@ -25,6 +25,8 @@ class NegotiationOutcome:
     message: str
     revised_request: str | None = None
     adjustment_factor: float | None = None
+    preferred_option: str | None = None
+    suggested_total: float | None = None
 
 
 def _convert_items(items: Iterable[Dict]) -> List[ParsedItem]:
@@ -87,6 +89,7 @@ def review_quote_tool(
     restock_items: List[Dict],
     quote_total: float,
     fulfilled: bool,
+    alternative_quotes: List[Dict] | None = None,
 ) -> Dict:
     """Evaluate an internal quote and decide whether to accept or counter-offer.
 
@@ -98,6 +101,7 @@ def review_quote_tool(
         restock_items: Items that triggered restock activity in the workflow.
         quote_total: Total quoted price from the internal agents.
         fulfilled: Whether the request can be fulfilled without adjustments.
+        alternative_quotes: Optional list of alternative quote bundles proposed by the quoting agent.
 
     Returns:
         Dictionary describing the negotiation outcome, including whether the
@@ -117,6 +121,68 @@ def review_quote_tool(
             "message": "Quote accepted as proposed.",
             "revised_request": None,
             "adjustment_factor": None,
+            "preferred_option": None,
+            "suggested_total": quote_total,
+        }
+
+    preferred_option_payload = None
+    if alternative_quotes:
+        viable_options = []
+        for option in alternative_quotes:
+            option_items = option.get("items") or []
+            if not option_items:
+                continue
+            parsed_option_items = _convert_items(option_items)
+            option_total = float(option.get("total", quote_total))
+            savings = option.get("savings_vs_primary")
+            viable_options.append(
+                {
+                    "option": option,
+                    "parsed_items": parsed_option_items,
+                    "total": option_total,
+                    "restock_avoided": bool(option.get("restock_avoided", False)),
+                    "savings": float(savings) if savings is not None else quote_total - option_total,
+                }
+            )
+
+        if viable_options:
+            viable_options.sort(
+                key=lambda candidate: (
+                    candidate["total"] > budget,
+                    not candidate["restock_avoided"],
+                    candidate["total"],
+                )
+            )
+            preferred = viable_options[0]
+            if preferred and (over_budget or restock_pressure or preferred["total"] <= budget):
+                option_label = preferred["option"].get("label")
+                reasons: List[str] = []
+                if preferred["total"] <= budget and over_budget:
+                    reasons.append("Selects an option within budget.")
+                if preferred["restock_avoided"]:
+                    reasons.append("Avoids restock delays.")
+                if preferred["savings"] > 0:
+                    reasons.append(f"Saves ${preferred['savings']:.2f} compared to the primary quote.")
+                if not reasons:
+                    reasons.append("Prefers an alternative package offered by the sales team.")
+
+                preferred_option_payload = {
+                    "message": " ".join(reasons),
+                    "revised_request": build_request_text(
+                        preferred["parsed_items"], persona=persona, event=event
+                    ),
+                    "preferred_option": option_label,
+                    "suggested_total": preferred["total"],
+                }
+
+    if preferred_option_payload:
+        return {
+            "accepted": False,
+            "message": preferred_option_payload["message"],
+            "revised_request": preferred_option_payload["revised_request"],
+            "adjustment_factor": None,
+            "preferred_option": preferred_option_payload["preferred_option"],
+            "suggested_total": preferred_option_payload["suggested_total"],
         }
 
     factor = _choose_factor(over_budget, restock_pressure)
@@ -127,6 +193,8 @@ def review_quote_tool(
         message_parts.append("Requested a reduced order to keep the quote within budget.")
     if restock_pressure or not fulfilled:
         message_parts.append("Adjusted pressure items to avoid supplier delays.")
+    if alternative_quotes and not preferred_option_payload:
+        message_parts.append("Could not use alternatives; quantities were still adjusted.")
     if not message_parts:
         message_parts.append("Suggested smaller quantities to secure faster fulfilment.")
 
@@ -135,6 +203,8 @@ def review_quote_tool(
         "message": " ".join(message_parts),
         "revised_request": revised_request,
         "adjustment_factor": factor,
+        "preferred_option": None,
+        "suggested_total": quote_total * factor,
     }
 
 
@@ -226,6 +296,7 @@ class CustomerInsightsAgent(ToolCallingAgent):
         restock_items: List[Dict],
         quote_total: float,
         fulfilled: bool,
+        alternative_quotes: List[Dict] | None = None,
     ) -> NegotiationOutcome:
         result = review_quote_tool(
             persona=persona,
@@ -235,12 +306,15 @@ class CustomerInsightsAgent(ToolCallingAgent):
             restock_items=restock_items,
             quote_total=quote_total,
             fulfilled=fulfilled,
+            alternative_quotes=alternative_quotes,
         )
         return NegotiationOutcome(
             accepted=bool(result["accepted"]),
             message=str(result["message"]),
             revised_request=result.get("revised_request"),
             adjustment_factor=result.get("adjustment_factor"),
+            preferred_option=result.get("preferred_option"),
+            suggested_total=result.get("suggested_total"),
         )
 
     def advise(self, request_summaries: List[Dict], final_financials: Dict) -> Dict:

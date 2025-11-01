@@ -72,6 +72,7 @@ def run_test_scenarios(*, model: OpenAIServerModel | None = None, requests: pd.D
                 "Collecting customer requirements",
                 "Consulting inventory specialist",
                 "Preparing pricing proposal",
+                "Coordinating substitution packages",
                 "Evaluating restock impact",
                 "Compiling customer-facing response",
             ]
@@ -88,6 +89,7 @@ def run_test_scenarios(*, model: OpenAIServerModel | None = None, requests: pd.D
             restock_items=response["restock"]["items"],
             quote_total=response["quote"]["total"],
             fulfilled=response["fulfilled"],
+            alternative_quotes=response["quote"].get("alternatives", []),
         )
 
         negotiation_applied = False
@@ -96,12 +98,32 @@ def run_test_scenarios(*, model: OpenAIServerModel | None = None, requests: pd.D
         elif customer_feedback.revised_request:
             render_negotiation_animation("Customer agent proposing counter-offer")
             print(f"CustomerInsightsAgent perspective: {customer_feedback.message}")
+            if customer_feedback.preferred_option:
+                suggested_total = customer_feedback.suggested_total
+                if suggested_total is not None:
+                    print(
+                        f"CustomerInsightsAgent preference: Adopt '{customer_feedback.preferred_option}' at ${suggested_total:.2f}."
+                    )
+                else:
+                    print(
+                        f"CustomerInsightsAgent preference: Adopt '{customer_feedback.preferred_option}'."
+                    )
             response = orchestrator.handle_request(customer_feedback.revised_request, request_date)
             negotiation_applied = True
             print("-- Updated quote after negotiation --")
             print(response["response_text"])
         else:
             print(f"CustomerInsightsAgent perspective: {customer_feedback.message}")
+            if customer_feedback.preferred_option:
+                suggested_total = customer_feedback.suggested_total
+                if suggested_total is not None:
+                    print(
+                        f"CustomerInsightsAgent note: Would prefer '{customer_feedback.preferred_option}' at ${suggested_total:.2f}."
+                    )
+                else:
+                    print(
+                        f"CustomerInsightsAgent note: Would prefer '{customer_feedback.preferred_option}'."
+                    )
 
         updated_report = generate_financial_report(request_date)
         print(f"Updated cash: ${updated_report['cash_balance']:.2f}")
@@ -118,6 +140,7 @@ def run_test_scenarios(*, model: OpenAIServerModel | None = None, requests: pd.D
                 "fulfilled": response["fulfilled"],
                 "restock_required": response["restock"]["restock_required"],
                 "restock_items": response["restock"].get("items", []),
+                "preferred_option": customer_feedback.preferred_option,
             }
         )
 
@@ -133,6 +156,7 @@ def run_test_scenarios(*, model: OpenAIServerModel | None = None, requests: pd.D
                 "restock_required": response["restock"]["restock_required"],
                 "negotiated": negotiation_applied,
                 "response_text": response["response_text"],
+                "preferred_option": customer_feedback.preferred_option,
             }
         )
 

@@ -9,10 +9,10 @@ We expose a layered architecture:
 - **Data layer (`project/data`)** – an SQLite-backed `DatabaseService` that encapsulates CSV loading, inventory seeding, transaction logging, financial reporting, and quote-history search.
 - **Utility layer (`project/utils`)** – helpers that parse free-form quote requests into structured item lists.
 - **Agent layer (`project/agents`)** – four specialised agents (Inventory, Quoting, Ordering, Finance) plus a single orchestrator. This satisfies the *max five agents* requirement.
-  - *InventoryAgent* summarises stock levels and highlights restock gaps.
-  - *QuotingAgent* prices requests with bulk discounts and historical guidance.
+  - *InventoryAgent* summarises stock levels, evaluates restock gaps, and now suggests catalogue substitutions when stock is tight.
+  - *QuotingAgent* prices requests with bulk discounts, historical guidance, and generates alternative quote bundles alongside the primary offer.
   - *OrderingAgent* executes supplier restock transactions through the database service.
-  - *CustomerInsightsAgent* both negotiates on behalf of the customer and provides financial/business recommendations.
+  - *CustomerInsightsAgent* negotiates on behalf of the customer, compares quote alternatives, and provides financial/business recommendations.
   - *BusinessOrchestrator* coordinates the specialists and can operate deterministically or through LLM tool-calling.
 - **Entry point (`project.py`)** – seeds the database, instantiates the agents, and processes the sample quote scenarios.
 
@@ -21,25 +21,50 @@ All inter-agent communication is textual and mediated through smolagents `ToolCa
 ### Agent Workflow Diagram
 
 ```mermaid
-flowchart LR
-    Q[Customer Quote Request] --> BO(BusinessOrchestrator)
-    BO -->|"inventory overview"| IA(InventoryAgent)
-    BO -->|"pricing context"| QA(QuotingAgent)
-    BO -->|"restock action"| OA(OrderingAgent)
-    BO -->|"financial & insights"| CIA(CustomerInsightsAgent)
+flowchart TD
+    customer["Customer request text"] --> parser["parse_request_items()"]
+    parser --> orchestrator["BusinessOrchestrator"]
+    orchestrator --> inventory_entry
+    orchestrator --> quoting_entry
+    orchestrator --> ordering_entry
+    orchestrator --> customer_entry
 
-    subgraph Tools
-        IA -->|`get_inventory_overview`<br/>`evaluate_restock_needs`| DB[(DatabaseService)]
-        QA -->|`prepare_quote`<br/>→ search_quote_history & pricing heuristics| DB
-        OA -->|`place_restock_order`<br/>→ record_transaction| DB
-        CIA -->|`get_financial_report`<br/>`review_quote`<br/>`generate_business_recommendations`| DB
+    subgraph InventoryAgent
+        direction TB
+        inventory_entry["InventoryAgent"]
+        inventory_entry --> inv_overview["get_inventory_overview_tool"] --> inv_get_all["get_all_inventory()"]
+        inventory_entry --> inv_restock["evaluate_restock_needs_tool"] --> inv_get_level["get_stock_level()"]
+        inventory_entry --> inv_subs["suggest_substitute_items_tool"] --> inv_peers["category_peers() + get_all_inventory()"]
     end
 
-    DB --> BO
-    BO --> CR[Customer-Facing Quote & Rationale]
+    subgraph QuotingAgent
+        direction TB
+        quoting_entry["QuotingAgent"]
+        quoting_entry --> quote_tool["prepare_quote_tool"]
+        quote_tool --> quote_price["_price_items()"]
+        quote_tool --> quote_history["search_quote_history()"]
+        quote_tool --> quote_alt["inventory substitution payload"]
+    end
+
+    subgraph OrderingAgent
+        direction TB
+        ordering_entry["OrderingAgent"]
+        ordering_entry --> order_tool["place_restock_order_tool"] --> order_txn["create_transaction()"]
+        order_tool --> order_cash["get_cash_balance()"]
+    end
+
+    subgraph CustomerInsightsAgent
+        direction TB
+        customer_entry["CustomerInsightsAgent"]
+        customer_entry --> insights_report["get_financial_report_tool"] --> report_call["generate_financial_report()"]
+        customer_entry --> insights_review["review_quote_tool"] --> review_builder["build_request_text()"]
+        customer_entry --> insights_reco["generate_business_recommendations_tool"] --> reco_metrics["aggregate scenario metrics"]
+    end
+
+    orchestrator --> summariser["_summarise_response()"]; summariser --> summary_finance["generate_financial_report()"]; summariser --> customer_output["Customer-facing quote narrative"]
 ```
 
-Rendered in ![Image](./AgentArchitecture.png)
+Rendered in ![Image](./AgentArchitecture.png). The Mermaid diagram above is the authoritative view and can be exported to update the PNG when needed.
 
 The orchestrator delegates to four worker agents (inventory, quoting, ordering, finance). Each tool shown maps directly to helper logic in the data layer (`DatabaseService`) so that responsibilities remain isolated and explainable.
 
@@ -76,10 +101,10 @@ The orchestrator delegates to four worker agents (inventory, quoting, ordering, 
 
 | Agent | Purpose | Key Tools |
 |-------|---------|-----------|
-| InventoryAgent | Summarise stock levels and restock gaps | `get_inventory_overview`, `evaluate_restock_needs` |
-| QuotingAgent | Price item collections with bulk discounts & historical context | `prepare_quote` |
+| InventoryAgent | Summarise stock levels, restock gaps, and surface viable substitutions | `get_inventory_overview`, `evaluate_restock_needs`, `suggest_substitute_items` |
+| QuotingAgent | Price primary and alternative bundles with bulk discounts & historical context | `prepare_quote` (now returns multi-option payloads) |
 | OrderingAgent | Execute supplier restock transactions | `place_restock_order` |
-| CustomerInsightsAgent | Produce financial reports, negotiate with customers, surface business recommendations | `get_financial_report`, `review_quote`, `generate_business_recommendations` |
+| CustomerInsightsAgent | Produce financial reports, evaluate quote alternatives, negotiate with customers, surface business recommendations | `get_financial_report`, `review_quote`, `generate_business_recommendations` |
 | BusinessOrchestrator | Coordinate the four specialists for each customer request | `process_customer_request` |
 
 Each tool wraps deterministic helpers so behaviour is consistent during automated evaluation, yet remains compatible with LLM-driven execution when `enable_llm=True`.
@@ -115,6 +140,6 @@ Feel free to adapt the agents, pricing logic, or orchestration prompts—the mod
 - The CSV provides per-request totals, cash, and inventory values so reviewers can quickly verify rubric thresholds.
 
 ### Future Improvements
-- **Negotiation loop**: add a lightweight customer-facing agent that can counter-offer or request substitutions when stock is low, showcasing richer tool usage.
+- **Negotiation loop**: add a lightweight customer-facing agent that can counter-offer or request substitutions when stock is low, showcasing richer tool usage. Implemented via alternative suggestion loop in `CustomerInsightsAgent`.
 - **Dynamic pricing**: extend `QuotingAgent` with margin-aware pricing or supplier lead times to better reflect real-world business constraints.
 - **Analytics dashboards**: surface aggregate metrics (e.g., fulfilment rates, cash trends) to help the business understand systemic bottlenecks over time.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from statistics import mean
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Set
 
 from smolagents import ToolCallingAgent, tool
 
@@ -76,26 +76,105 @@ def _generate_quote(items: List[ParsedItem], context_terms: Iterable[str]) -> Qu
     )
 
 
+def _generate_alternative_quotes(
+    items: List[ParsedItem],
+    suggestions: List[Dict],
+    context_terms: Iterable[str],
+) -> List[Dict]:
+    alternatives: List[Dict] = []
+    seen_labels: Set[str] = set()
+
+    for suggestion in suggestions or []:
+        base_item = suggestion.get("item_name")
+        requested_qty = int(suggestion.get("requested", 0)) if suggestion.get("requested") is not None else 0
+        if not base_item or requested_qty <= 0:
+            continue
+
+        for candidate in suggestion.get("alternatives", []):
+            replacement = candidate.get("item_name")
+            if not replacement:
+                continue
+            if not candidate.get("covers_full_quantity", False):
+                continue
+
+            label = f"{base_item} → {replacement}"
+            if label in seen_labels:
+                continue
+            seen_labels.add(label)
+
+            replacement_items: List[ParsedItem] = []
+            for entry in items:
+                if entry.name == base_item:
+                    replacement_items.append(
+                        ParsedItem(
+                            name=replacement,
+                            quantity=requested_qty,
+                            unit_price=float(candidate.get("unit_price", entry.unit_price)),
+                        )
+                    )
+                else:
+                    replacement_items.append(
+                        ParsedItem(name=entry.name, quantity=entry.quantity, unit_price=entry.unit_price)
+                    )
+
+            quote = _generate_quote(replacement_items, context_terms)
+            items_payload = [
+                {"name": entry.name, "quantity": entry.quantity, "unit_price": entry.unit_price}
+                for entry in replacement_items
+            ]
+
+            alternatives.append(
+                {
+                    "label": label,
+                    "replaced_item": base_item,
+                    "replacement": replacement,
+                    "restock_avoided": True,
+                    "total": quote.total,
+                    "explanation": quote.explanation,
+                    "itemised": quote.itemised,
+                    "items": items_payload,
+                    "reason": candidate.get("reason"),
+                    "price_delta": candidate.get("price_delta"),
+                }
+            )
+
+    return alternatives
+
+
 @tool
-def prepare_quote_tool(items: List[Dict], context_terms: List[str]) -> Dict:
+def prepare_quote_tool(
+    items: List[Dict],
+    context_terms: List[str],
+    alternative_suggestions: List[Dict] | None = None,
+) -> Dict:
     """Prepare a quote for requested items.
 
     Args:
         items: List of dictionaries containing ``name``, ``quantity``, and ``unit_price``.
         context_terms: Tokenised context extracted from the customer request.
+        alternative_suggestions: Optional substitution suggestions supplied by the inventory agent.
 
     Returns:
-        Dictionary with ``success`` flag, total price, narrative explanation, and itemised lines.
+        Dictionary with ``success`` flag, total price, narrative explanation, itemised lines,
+        and alternative quote options when substitutions are available.
     """
 
     parsed = [ParsedItem(**item) for item in items]
     quote = _generate_quote(parsed, context_terms)
-    return {
+    payload = {
         "success": True,
         "total": quote.total,
         "explanation": quote.explanation,
         "itemised": quote.itemised,
     }
+
+    alternatives = _generate_alternative_quotes(parsed, alternative_suggestions or [], context_terms)
+    if alternatives:
+        for option in alternatives:
+            option["savings_vs_primary"] = round(payload["total"] - option["total"], 2)
+        payload["alternatives"] = alternatives
+
+    return payload
 
 
 class QuotingAgent(ToolCallingAgent):
@@ -109,12 +188,25 @@ class QuotingAgent(ToolCallingAgent):
             description="Generate quotes using historical data and pricing heuristics.",
         )
 
-    def build_quote(self, items: List[ParsedItem], terms: Iterable[str]) -> Dict:
+    def build_quote(
+        self,
+        items: List[ParsedItem],
+        terms: Iterable[str],
+        alternative_suggestions: List[Dict] | None = None,
+    ) -> Dict:
         quote = _generate_quote(items, terms)
-        return {
+        payload = {
             "success": True,
             "total": quote.total,
             "explanation": quote.explanation,
             "itemised": quote.itemised,
         }
+
+        alternatives = _generate_alternative_quotes(items, alternative_suggestions or [], terms)
+        if alternatives:
+            for option in alternatives:
+                option["savings_vs_primary"] = round(payload["total"] - option["total"], 2)
+            payload["alternatives"] = alternatives
+
+        return payload
 

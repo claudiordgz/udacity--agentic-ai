@@ -34,7 +34,26 @@ def evaluate_quoting_agent(*, model: Optional[object] = None, offline: bool = Fa
     items = [ParsedItem(name=row["item_name"], quantity=quantity, unit_price=unit_price)]
     terms = [row["item_name"].split()[0].lower(), "bulk"]
 
-    quote = quoting_agent.build_quote(items, terms)
+    dummy_suggestion = [
+        {
+            "item_name": row["item_name"],
+            "requested": quantity,
+            "current_stock": 0,
+            "deficit": quantity,
+            "alternatives": [
+                {
+                    "item_name": row["item_name"],
+                    "available_stock": quantity * 2,
+                    "unit_price": unit_price,
+                    "covers_full_quantity": True,
+                    "price_delta": 0,
+                    "reason": "Synthetic alternative for evaluation",
+                }
+            ],
+        }
+    ]
+
+    quote = quoting_agent.build_quote(items, terms, alternative_suggestions=dummy_suggestion)
     if not quote.get("success"):
         raise AssertionError("Quote generation failed")
 
@@ -46,8 +65,13 @@ def evaluate_quoting_agent(*, model: Optional[object] = None, offline: bool = Fa
             f"Expected discounted total {expected_total}, received {actual_total}"
         )
 
+    alternatives = quote.get("alternatives", [])
+    if not alternatives:
+        raise AssertionError("Quoting agent should expose alternative quote options when provided suggestions")
+
     return {
         "quote_total": actual_total,
         "itemised_count": len(quote.get("itemised", [])),
+        "alternatives": len(alternatives),
     }
 

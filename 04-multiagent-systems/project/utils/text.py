@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from difflib import get_close_matches
-from typing import Iterable, List, Optional
+from functools import lru_cache
+from typing import Dict, Iterable, List, Optional
 
 from data import PAPER_SUPPLIES
 
@@ -45,6 +46,43 @@ def parse_request_items(request_text: str) -> List[ParsedItem]:
         parsed.quantity = quantity
         items.append(parsed)
     return items
+
+
+@lru_cache(maxsize=1)
+def _supply_index() -> Dict[str, Dict]:
+    return {entry["item_name"].lower(): entry for entry in PAPER_SUPPLIES}
+
+
+@lru_cache(maxsize=1)
+def _category_index() -> Dict[str, List[Dict]]:
+    categories: Dict[str, List[Dict]] = {}
+    for entry in PAPER_SUPPLIES:
+        categories.setdefault(entry.get("category", "uncategorised"), []).append(entry)
+    return categories
+
+
+def get_supply_entry(item_name: str) -> Optional[Dict]:
+    """Return the static catalogue entry for a supply item."""
+
+    if not item_name:
+        return None
+    return _supply_index().get(item_name.lower())
+
+
+def category_peers(item_name: str, *, include_self: bool = False) -> List[Dict]:
+    """Return catalogue peers that share the same category as ``item_name``."""
+
+    entry = get_supply_entry(item_name)
+    if not entry:
+        return []
+    category = entry.get("category")
+    if not category:
+        return []
+    peers = list(_category_index().get(category, []))
+    if include_self:
+        return peers
+    lower_name = item_name.lower()
+    return [peer for peer in peers if peer["item_name"].lower() != lower_name]
 
 
 def build_request_text(

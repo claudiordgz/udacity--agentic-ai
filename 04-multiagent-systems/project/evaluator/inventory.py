@@ -41,8 +41,15 @@ def evaluate_inventory_agent(*, model: Optional[object] = None, offline: bool = 
     if not restock_plan.get("restock_required"):
         raise AssertionError("Restock plan should have detected a deficit")
 
+    suggestions = inventory_agent.suggest_alternatives([restock_test_item], restock_plan, as_of_date)
+    if not suggestions.get("success"):
+        raise AssertionError("Inventory agent did not surface substitution options for deficit items")
+    if not suggestions.get("suggestions"):
+        raise AssertionError("Substitution payload missing alternatives")
+
     return {
         "inventory_items": len(items),
         "restock_entries": len(restock_plan.get("items", [])),
+        "alternative_suggestions": len(suggestions.get("suggestions", [])),
     }
 
